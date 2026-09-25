@@ -362,7 +362,7 @@
         "start_col": { "$ref": "#/$defs/pos" },
         "end_line": { "$ref": "#/$defs/pos" },
         "end_col": { "$ref": "#/$defs/pos" },
-        "cause": { "enum": ["typed", "command", "paste", "cut", "undo", "redo", "drop", "ime", "flush", "other", "unknown"] },
+        "cause": { "enum": ["typed", "command", "paste", "cut", "undo", "redo", "drop", "ime", "flush", "find_replace", "other", "unknown"] },
         "undo": { "type": "boolean" },
         "redo": { "type": "boolean" },
         "flush": { "type": "boolean" }

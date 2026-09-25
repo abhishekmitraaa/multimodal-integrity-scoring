@@ -177,3 +177,9 @@ button:disabled {
     height: auto;
   }
 }
+
+/* D-027: find stays available; replace is not offered. Its shortcuts are blocked in editor.ts. */
+.monaco-editor .find-widget .button.toggle,
+.monaco-editor .find-widget > .replace-part {
+  display: none !important;
+}

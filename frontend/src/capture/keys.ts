@@ -38,6 +38,27 @@ export function modifierMask(e: { shiftKey: boolean; ctrlKey: boolean; altKey: b
   return (e.shiftKey ? MOD_SHIFT : 0) | (e.ctrlKey ? MOD_CTRL : 0) | (e.altKey ? MOD_ALT : 0) | (e.metaKey ? MOD_META : 0);
 }
 
+export type BlockedKeyMod = "ctrl" | "meta" | "shift" | "alt";
+
+/** A key the editor policy stops before Monaco sees it (config/editor_policy.yaml: blocked_keys). */
+export interface BlockedKey {
+  code: string;
+  mods: BlockedKeyMod[];
+}
+
+/** True when the keydown's code matches and exactly the listed modifiers are held. */
+export function isBlockedKey(
+  e: { code: string; ctrlKey: boolean; metaKey: boolean; shiftKey: boolean; altKey: boolean },
+  blocked: readonly BlockedKey[],
+): boolean {
+  return blocked.some((b) =>
+    b.code === e.code &&
+    e.ctrlKey === b.mods.includes("ctrl") &&
+    e.metaKey === b.mods.includes("meta") &&
+    e.shiftKey === b.mods.includes("shift") &&
+    e.altKey === b.mods.includes("alt"));
+}
+
 /** KeyboardEvent.code restricted to the schema's alphabet. */
 export function safeCode(code: string): string {
   return code.replace(/[^A-Za-z0-9]/g, "").slice(0, 32);

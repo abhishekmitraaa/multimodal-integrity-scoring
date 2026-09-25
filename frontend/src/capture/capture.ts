@@ -16,6 +16,13 @@ export interface CaptureConfig {
 
 export type SnapshotReason = "timer" | "large_insert" | "run" | "submit" | "segment_start" | "resync";
 
+/** Same window as the keydown → change window used for "typed" below. */
+const FIND_WIDGET_WINDOW_MS = 250;
+
+function inFindWidget(node: EventTarget | Element | null): boolean {
+  return node instanceof Element && node.closest(".find-widget") !== null;
+}
+
 export class Capture {
   private lastKey: { cat: KeyCategory; mods: number; t: number } | null = null;
   private pasteInfo: { len: number; newlines: number; trusted: boolean; mimes: string[] } | null = null;
@@ -23,6 +30,7 @@ export class Capture {
   private cutCauseUntil = 0;
   private dropCauseUntil = 0;
   private compositionEndedAt = -1;
+  private findWidgetAt = Number.NEGATIVE_INFINITY;
   private lastSnapshotVersion = -1;
   private lastCursorAt = 0;
   private disposers: Array<() => void> = [];
@@ -71,8 +79,9 @@ export class Capture {
     const onKey = (type: "keydown" | "keyup") => (e: KeyboardEvent) => {
       const cat = keyCategory(e.key);
       const mods = modifierMask(e);
-      const target = (e.target as Element | null)?.closest(".find-widget") ? "find_widget" : "editor";
+      const target = inFindWidget(e.target) ? "find_widget" : "editor";
       if (type === "keydown" && target === "editor") this.lastKey = { cat, mods, t: performance.now() };
+      if (type === "keydown" && target === "find_widget") this.findWidgetAt = performance.now();
       this.log.push(type, {
         code: safeCode(e.code), cat, rep: e.repeat, mods, trusted: e.isTrusted,
         composing: e.isComposing, target, ...this.position(),
@@ -81,8 +90,16 @@ export class Capture {
     on(dom, "keydown", onKey("keydown"));
     on(dom, "keyup", onKey("keyup"));
 
-    // Clipboard.
+    // Pointer use of the find widget (its buttons), for find_replace attribution.
+    for (const type of ["pointerdown", "click"]) {
+      on(dom, type, (e: Event) => {
+        if (inFindWidget(e.target)) this.findWidgetAt = performance.now();
+      });
+    }
+
+    // Clipboard. A paste into the find widget's input does not touch the model.
     on(dom, "paste", (e: ClipboardEvent) => {
+      if (inFindWidget(e.target)) return;
       const text = e.clipboardData?.getData("text/plain") ?? "";
       this.pasteInfo = {
         len: text.length,
@@ -191,6 +208,13 @@ export class Capture {
     if (e.isFlush) return "flush";
     if (e.isUndoing) return "undo";
     if (e.isRedoing) return "redo";
+    // Replace is hidden and its keys are blocked (D-027). If an edit still comes from the find
+    // widget (focus is there, or it was used after the last editor keydown), label it as such.
+    const lastEditorKeyAt = this.lastKey?.t ?? Number.NEGATIVE_INFINITY;
+    if (inFindWidget(document.activeElement) ||
+        (now - this.findWidgetAt < FIND_WIDGET_WINDOW_MS && this.findWidgetAt >= lastEditorKeyAt)) {
+      return "find_replace";
+    }
     if (now < this.pasteCauseUntil) {
       this.pasteCauseUntil = 0;
       return "paste";

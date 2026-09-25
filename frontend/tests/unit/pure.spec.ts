@@ -1,7 +1,7 @@
 // Unit tests for pure modules, run by the Playwright Test runner (D-009). Inputs are SYNTHETIC.
 import { expect, test } from "@playwright/test";
 import { parseUserAgent } from "../../src/capture/device";
-import { keyCategory, modifierMask, safeCode } from "../../src/capture/keys";
+import { isBlockedKey, keyCategory, modifierMask, safeCode, type BlockedKey } from "../../src/capture/keys";
 import { EventLog } from "../../src/capture/log";
 import { replayText } from "../../src/replay";
 
@@ -21,6 +21,25 @@ test.describe("key categories (SPEC 4.6)", () => {
   test("code sanitised to schema alphabet", () => {
     expect(safeCode("KeyA")).toBe("KeyA");
     expect(safeCode("Weird-Key!")).toBe("WeirdKey");
+  });
+});
+
+test.describe("blocked keys (D-027)", () => {
+  const blocked: BlockedKey[] = [{ code: "KeyH", mods: ["ctrl"] }, { code: "Digit1", mods: ["ctrl", "shift"] }, { code: "F1", mods: [] }];
+  const ev = (code: string, mods: { ctrl?: boolean; meta?: boolean; shift?: boolean; alt?: boolean } = {}) => ({
+    code, ctrlKey: !!mods.ctrl, metaKey: !!mods.meta, shiftKey: !!mods.shift, altKey: !!mods.alt,
+  });
+  test("exact modifier set matches", () => {
+    expect(isBlockedKey(ev("KeyH", { ctrl: true }), blocked)).toBe(true);
+    expect(isBlockedKey(ev("Digit1", { ctrl: true, shift: true }), blocked)).toBe(true);
+    expect(isBlockedKey(ev("F1"), blocked)).toBe(true);
+  });
+  test("plain typing and other chords pass", () => {
+    expect(isBlockedKey(ev("KeyH"), blocked)).toBe(false);                            // typing "h"
+    expect(isBlockedKey(ev("KeyH", { ctrl: true, shift: true }), blocked)).toBe(false);
+    expect(isBlockedKey(ev("Digit1", { shift: true }), blocked)).toBe(false);         // typing "!"
+    expect(isBlockedKey(ev("KeyH", { meta: true }), blocked)).toBe(false);
+    expect(isBlockedKey(ev("F1", { shift: true }), blocked)).toBe(false);
   });
 });
 

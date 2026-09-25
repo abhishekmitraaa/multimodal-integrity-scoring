@@ -53,6 +53,18 @@ def test_editor_policy_blocks_untracked_insertion() -> None:
     assert opts["dropIntoEditor"]["enabled"] is False
 
 
+def test_editor_policy_blocks_replace_shortcuts() -> None:
+    """D-027: every Monaco 0.57 replace shortcut is blocked, on Windows/Linux and macOS."""
+    blocked = {(k["code"], frozenset(k["mods"])) for k in cfg("editor_policy")["blocked_keys"]}
+    for code, mods in [
+        ("KeyH", {"ctrl"}), ("KeyF", {"meta", "alt"}),
+        ("Digit1", {"ctrl", "shift"}), ("Digit1", {"meta", "shift"}),
+        ("Enter", {"ctrl", "alt"}), ("Enter", {"meta", "alt"}),
+    ]:
+        assert (code, frozenset(mods)) in blocked
+    assert "disabled_commands" not in cfg("editor_policy")   # replaced: it was never enforced
+
+
 def test_encoder_config_matches_verified_typenet_values() -> None:
     """Values checked against TypeNet arXiv:2101.05570v3 (docs/p2_protocol.md)."""
     enc = cfg("models")["keystroke_encoder"]

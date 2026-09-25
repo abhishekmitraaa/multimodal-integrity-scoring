@@ -1,7 +1,7 @@
 # Monaco editor options served to the client, hashed and logged per segment.
 # Goal: no text enters the editor without a logged keystroke or clipboard event.
 # [VERIFY-P1] every option name is checked against the pinned Monaco version by a Playwright test.
-policy_id: policy-v1
+policy_id: policy-v2               # v2: blocked_keys enforced, replace UI hidden (D-027)
 monaco_options:
   quickSuggestions: false
   suggestOnTriggerCharacters: false
@@ -29,8 +29,17 @@ monaco_options:
   contextmenu: false
   emptySelectionClipboard: false
   copyWithSyntaxHighlighting: false
-disabled_commands:                     # removed from keybindings
-  - editor.action.quickCommand         # command palette (F1)
-  - editor.action.startFindReplaceAction
-  - editor.action.triggerSuggest
-  - editor.action.formatDocument
+# Keydowns stopped before Monaco sees them (the keydown itself is still logged). A key matches when
+# its KeyboardEvent.code is equal and exactly these modifiers (ctrl, meta, shift, alt) are held.
+# Monaco 0.57 bindings: Ctrl+H / Cmd+Alt+F open replace; Ctrl|Cmd+Shift+1 replaces one and
+# Ctrl|Cmd+Alt+Enter replaces all whenever the find widget is open, even with the replace row hidden.
+# Suggest, formatting and the command palette module are never loaded (D-023).
+# Find stays available (read-only); its replace UI is hidden and its shortcuts are blocked (D-027).
+blocked_keys:
+  - {code: KeyH, mods: [ctrl]}            # open find/replace
+  - {code: KeyF, mods: [meta, alt]}       # open find/replace (macOS)
+  - {code: Digit1, mods: [ctrl, shift]}   # replace one
+  - {code: Digit1, mods: [meta, shift]}   # replace one (macOS)
+  - {code: Enter, mods: [ctrl, alt]}      # replace all
+  - {code: Enter, mods: [meta, alt]}      # replace all (macOS)
+  - {code: F1, mods: []}                  # command palette

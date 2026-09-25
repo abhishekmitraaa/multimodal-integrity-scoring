@@ -13,6 +13,7 @@ import "monaco-editor/editor/contrib/cursorUndo/browser/cursorUndo";
 import "monaco-editor/editor/contrib/bracketMatching/browser/bracketMatching";
 import "monaco-editor/languages/definitions/python/register";
 import EditorWorker from "monaco-editor/editor/editor.worker?worker";
+import { isBlockedKey, type BlockedKey } from "./capture/keys";
 
 export { monaco };
 
@@ -23,7 +24,7 @@ export { monaco };
 export interface EditorPolicy {
   policy_id: string;
   monaco_options: Record<string, unknown>;
-  disabled_commands: string[];
+  blocked_keys: BlockedKey[];
   sha256: string;
 }
 
@@ -47,9 +48,14 @@ export function createEditor(host: HTMLElement, policy: EditorPolicy, initialTex
     insertSpaces: true,
     scrollBeyondLastLine: false,
   });
-  // The find widget's replace action inserts text without keystrokes: swallow its shortcut.
-  // (Replace via the widget's toggle button is still possible and is attributed "unknown".)
-  editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyH, () => {});
+  // Blocked keys (D-027): stopped in the capture phase on the editor node, before Monaco's own
+  // handlers see them. The capture layer's listener on the same node still logs the keydown.
+  // Replace inserts text without keystrokes; its toggle and row are also hidden in style.css.
+  editor.getDomNode()!.addEventListener("keydown", (e) => {
+    if (!isBlockedKey(e, policy.blocked_keys)) return;
+    e.preventDefault();
+    e.stopPropagation();
+  }, true);
   return editor;
 }
 
