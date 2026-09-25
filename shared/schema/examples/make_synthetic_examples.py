@@ -143,7 +143,8 @@ def main() -> None:
         ("synthetic_batch_typing.json", typing_example()),
         ("synthetic_batch_paste.json", paste_example()),
     ]:
-        (HERE / name).write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        text = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
+        (HERE / name).write_text(text, encoding="utf-8", newline="\n")
         print(f"wrote {name}")
 
 
