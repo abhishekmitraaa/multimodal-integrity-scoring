@@ -26,6 +26,11 @@ the bottom. See [SPEC.md](SPEC.md) for context.
 | D-018 | Fusion distance weights are constrained $w \le 0$ during fitting (L-BFGS-B bounds), not only checked afterwards. | accepted (pre-P1) | SPEC 7.4 |
 | D-019 | Recruit 50+ participants. A live-LLM A5 subset of 8–10 is labelled `A5_live`. Ethics approval is required before any real collection. | accepted (Q3) | SPEC 12.2 |
 | D-020 | Cluster bootstrap over users. The exact TypeNet protocol is documented item by item before P2 training. | accepted (Q5) | SPEC 12.5, 12.7 |
+| D-021 | Serve the app cross-origin isolated (COOP/COEP) by default. Measured timer resolution: 5–20 µs isolated vs 100 µs–1 ms plain. | proposed (P1) | SPEC 4.1, P1 report |
+| D-022 | Three participant kinds: `P-` real (refused until `real_collection_enabled` after ethics approval), `SYN-` synthetic, `DEV-` team testing (never used in results). | proposed (P1) | SPEC 3 |
+| D-023 | Load only the Monaco contributions we need; text-inserting features are never loaded, not just switched off. | proposed (P1) | SPEC 4.8 |
+| D-024 | P1 stores the client's `cause` hint; server-side canonical attribution is built in P3. | proposed (P1) | SPEC 4.7 |
+| D-025 | Supported study browsers: Chromium and Firefox (verified), or add Safari after a Mac check. | open (P1) | P1 report |
 
 ## Open
 

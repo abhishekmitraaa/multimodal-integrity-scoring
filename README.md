@@ -46,23 +46,47 @@ The full design is in [docs/SPEC.md](docs/SPEC.md) and decisions are logged in
 
 | Phase | Scope | Status |
 |---|---|---|
-| P0 | Repo skeleton and spec | awaiting approval |
-| P1 | Capture app, server log, replay | not started |
+| P0 | Repo skeleton and spec | approved with changes |
+| P1 | Capture app, server log, replay | done, awaiting approval ([report](docs/phase-reports/P1.md)) |
 | P2 | Keystroke features and baseline model on public data | not started; Aalto licence pending |
 | P3 | Enrollment, process/AST/clipboard features, fusion, thresholds | not started |
 | P4 | Reviewer dashboard | not started |
 | P5 | Data collection tooling, evaluation harness, attack report | not started; ethics checklist first |
 | P6 | Paper and patent-support documents | not started |
 
-## Running the tests
+## Setup (Windows; use `.venv/bin/python` on Linux/macOS)
 
-Python 3.11 is the target. The repo-wide contract tests only need `pytest`, `PyYAML` and
-`jsonschema`:
+The repository lives at `C:\dev\integrity-exam`, outside OneDrive. You need Python 3.11 (pinned),
+Node 22+ and Docker Desktop.
 
 ```bash
-python -m venv .venv
-.venv/Scripts/python -m pip install -r requirements-dev.txt   # on Linux/macOS: .venv/bin/python
-.venv/Scripts/python -m pytest
+py -3.11 -m venv .venv
+.venv/Scripts/python -m pip install -r requirements-dev.txt -e "backend[dev]" -e ml -e eval
+.venv/Scripts/python scripts/make_secrets.py        # local keys and tokens in secrets/ (git-ignored)
+docker compose up -d db                              # PostgreSQL 16 on 127.0.0.1:5432
+cd frontend && npm install && npx playwright install chromium firefox webkit
+```
+
+## Running the app locally (development data only)
+
+```bash
+# terminal 1: database schema, then the API on :8000
+.venv/Scripts/python -m alembic -c backend/alembic.ini upgrade head
+set INTEGRITY_DATA_ROOT=C:\integrity-data           # must be outside the repo and cloud sync
+.venv/Scripts/python -m integrity_backend.app
+# terminal 2: the web app on :5173 (set COI=1 to serve cross-origin isolated)
+cd frontend && npm run dev
+```
+
+Open http://127.0.0.1:5173. It creates `DEV-` participants. Real participants are refused until
+`real_collection_enabled` is set after ethics approval. The reviewer replay page is at `#/replay`,
+using the token in `secrets/reviewer_token.txt`.
+
+## Running the tests
+
+```bash
+.venv/Scripts/python -m pytest          # all Python tests; the database tests need `docker compose up -d db`
+cd frontend && npx playwright test      # starts its own backend on a throwaway database, plus Vite
 ```
 
 ## Data rules
