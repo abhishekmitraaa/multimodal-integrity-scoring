@@ -2,14 +2,14 @@ import { defineConfig, devices } from "@playwright/test";
 
 const python = process.platform === "win32" ? "..\\.venv\\Scripts\\python.exe" : "../.venv/bin/python";
 
-// Port 5173 serves the app normally; 5174 serves it cross-origin isolated (COOP/COEP) so the
-// timing measurements can compare both (SPEC 4.1, 4.11).
+// Port 5173 serves the app as deployed, cross-origin isolated (COOP/COEP, D-021); 5174 serves it
+// without isolation, so the timing measurements can compare both (SPEC 4.1, 4.11).
 export default defineConfig({
   testDir: "tests",
   timeout: 120_000,
   workers: 1,
   reporter: [["list"]],
-  // BASE_URL=http://127.0.0.1:5174 runs the suite cross-origin isolated.
+  // BASE_URL=http://127.0.0.1:5174 runs the suite without cross-origin isolation.
   use: { baseURL: process.env.BASE_URL ?? "http://127.0.0.1:5173", trace: "retain-on-failure" },
   webServer: [
     {
@@ -23,7 +23,7 @@ export default defineConfig({
     {
       command: "npx vite --port 5174 --strictPort",
       url: "http://127.0.0.1:5174",
-      env: { COI: "1" },
+      env: { COI: "0" },
       timeout: 60_000,
       reuseExistingServer: false,
     },

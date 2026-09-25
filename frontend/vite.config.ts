@@ -1,8 +1,8 @@
 import { defineConfig } from "vite";
 
-// COI=1 serves the app cross-origin isolated (COOP/COEP), which changes browser timer precision.
-// P1 measures timing with and without it (SPEC 4.1, 4.11).
-const crossOriginIsolated = process.env.COI === "1";
+// The app is served cross-origin isolated (COOP/COEP) by default (D-021): finer timers, and the same
+// setting for every session. COI=0 serves it without isolation, only to measure the difference.
+const crossOriginIsolated = process.env.COI !== "0";
 
 export default defineConfig({
   server: {

@@ -7,8 +7,8 @@ import { expect, test } from "@playwright/test";
 import { drain, mod, serverEvents, startSession } from "./helpers";
 
 const ORIGINS = [
-  { label: "plain", base: "http://127.0.0.1:5173" },
-  { label: "coop_coep", base: "http://127.0.0.1:5174" },
+  { label: "plain", base: "http://127.0.0.1:5174" },
+  { label: "coop_coep", base: "http://127.0.0.1:5173" },
 ];
 
 /** Coarsest candidate grid (µs) that every value sits on. */
