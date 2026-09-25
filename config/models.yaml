@@ -1,18 +1,37 @@
-# Models. See docs/SPEC.md section 7. Values marked VERIFY come from TypeNet and must be checked in P2.
+# Models. See docs/SPEC.md section 7. "TypeNet §x" = checked against arXiv:2101.05570v3
+# (docs/p2_protocol.md). Deviations from the paper are listed in docs/p2_protocol.md section 9.
 keystroke_encoder:
   kind: typenet_lstm
-  input_features: 5              # keycode, HL, IL, PL, RL  [VERIFY]
-  lstm_layers: 2                 # [BRIEF]
-  hidden_units: 128              # [BRIEF]
-  embedding_dim: 128             # [BRIEF]
-  dropout: 0.5                   # [VERIFY]
-  loss: triplet                  # [BRIEF]
-  triplet_margin: 1.5            # [VERIFY]
+  input_features: 5              # keycode/255, HL, IL, PL, RL in seconds (TypeNet §4.1)
+  lstm_layers: 2                 # TypeNet §4.2
+  hidden_units: 128              # TypeNet §4.2
+  embedding_dim: 128             # final LSTM state, no dense layer (TypeNet §4.2, Fig. 2)
+  input_batch_norm: true         # Fig. 2; confirmed by the 200,458-parameter count
+  dropout: 0.5                   # between the LSTM layers, with batch norm (TypeNet §4.2)
+  recurrent_dropout: 0.2         # TypeNet §4.2; omitted in the first PyTorch run (deviation 3)
+  loss: triplet                  # squared Euclidean distances (TypeNet Eq. 4)
+  triplet_margin: 1.5            # TypeNet §4.4
+  triplet_mining: random         # TypeNet §4.4 and §7
   optimizer: adam
-  learning_rate: 0.005           # [VERIFY]
-  batch_size: 512
-  max_epochs: 200
+  learning_rate: 0.05            # TypeNet §4.4 (was 0.005 here before verification)
+  adam_betas: [0.9, 0.999]       # TypeNet §4.4
+  adam_eps: 1.0e-8               # TypeNet §4.4
+  batch_size: 512                # TypeNet §4.4 ("512 sequences"; read as 512 triplets)
+  max_epochs: 200                # TypeNet §4.4; no early stopping
+  batches_per_epoch: 150         # TypeNet §4.4
   pretrain_dataset: aalto_desktop   # blocked on licence confirmation
+reproduction:                    # P2 TypeNet reproduction on D1 (docs/p2_protocol.md)
+  train_subjects: 68000          # TypeNet §4.4, "the first 68,000 subjects"
+  test_subjects_k: 1000          # TypeNet §6.1, Table 2
+  sequences_per_subject: 15      # TypeNet §3
+  genuine_query_indices: [10, 11, 12, 13, 14]   # authors' README code
+  impostor_query_index: 11       # authors' README code
+  g_values: [1, 2, 5, 7, 10]     # Table 2
+  m_values: [50, 70]             # rows used for acceptance
+  scoring: mean_distance_to_gallery   # TypeNet Eq. 5
+  eer: per_subject_mean          # TypeNet §5.1
+  eer_threshold_steps: 10000     # authors' README code
+  random_test_draws: 5           # spread over random choices of the k test subjects
 digraph_baseline:
   min_occurrences: 3
   min_shared_items: 5

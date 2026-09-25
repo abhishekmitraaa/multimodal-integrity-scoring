@@ -53,6 +53,19 @@ def test_editor_policy_blocks_untracked_insertion() -> None:
     assert opts["dropIntoEditor"]["enabled"] is False
 
 
+def test_encoder_config_matches_verified_typenet_values() -> None:
+    """Values checked against TypeNet arXiv:2101.05570v3 (docs/p2_protocol.md)."""
+    enc = cfg("models")["keystroke_encoder"]
+    assert enc["learning_rate"] == 0.05
+    assert enc["triplet_margin"] == 1.5
+    assert (enc["dropout"], enc["recurrent_dropout"]) == (0.5, 0.2)
+    assert (enc["max_epochs"], enc["batches_per_epoch"], enc["batch_size"]) == (200, 150, 512)
+    rep = cfg("models")["reproduction"]
+    assert (rep["train_subjects"], rep["test_subjects_k"]) == (68000, 1000)
+    assert rep["g_values"] == [1, 2, 5, 7, 10]
+    assert rep["genuine_query_indices"] == [10, 11, 12, 13, 14]
+
+
 def test_keystroke_window_matches_brief() -> None:
     ks = cfg("features")["keystroke"]
     assert ks["window_keystrokes"] == 70
