@@ -1,0 +1,23 @@
+{
+  "name": "integrity-frontend",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "copy-pyodide": "node scripts/copy-pyodide.mjs",
+    "dev": "npm run copy-pyodide && vite",
+    "build": "npm run copy-pyodide && tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "playwright test"
+  },
+  "dependencies": {
+    "monaco-editor": "^0.57.0",
+    "pyodide": "^314.0.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.2",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1"
+  }
+}

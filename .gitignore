@@ -35,3 +35,8 @@ eval/ledger/
 Thumbs.db
 .vscode/
 .idea/
+
+# Frontend build artefacts
+frontend/public/pyodide/
+frontend/blob-report/
+frontend/measurements/
