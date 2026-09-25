@@ -26,14 +26,22 @@ the bottom. See [SPEC.md](SPEC.md) for context.
 | D-018 | Fusion distance weights are constrained $w \le 0$ during fitting (L-BFGS-B bounds), not only checked afterwards. | accepted (pre-P1) | SPEC 7.4 |
 | D-019 | Recruit 50+ participants. A live-LLM A5 subset of 8–10 is labelled `A5_live`. Ethics approval is required before any real collection. | accepted (Q3) | SPEC 12.2 |
 | D-020 | Cluster bootstrap over users. The exact TypeNet protocol is documented item by item before P2 training. | accepted (Q5) | SPEC 12.5, 12.7 |
-| D-021 | Serve the app cross-origin isolated (COOP/COEP) by default. Measured timer resolution: 5–20 µs isolated vs 100 µs–1 ms plain. | proposed (P1) | SPEC 4.1, P1 report |
-| D-022 | Three participant kinds: `P-` real (refused until `real_collection_enabled` after ethics approval), `SYN-` synthetic, `DEV-` team testing (never used in results). | proposed (P1) | SPEC 3 |
-| D-023 | Load only the Monaco contributions we need; text-inserting features are never loaded, not just switched off. | proposed (P1) | SPEC 4.8 |
-| D-024 | P1 stores the client's `cause` hint; server-side canonical attribution is built in P3. | proposed (P1) | SPEC 4.7 |
-| D-025 | Supported study browsers: Chromium and Firefox (verified), or add Safari after a Mac check. | open (P1) | P1 report |
+| D-021 | Serve the app cross-origin isolated (COOP/COEP) by default. Measured timer resolution: 5–20 µs isolated vs 100 µs–1 ms plain. **Conditions:** the same setting for every enrollment and exam session; no claim that it improves identity accuracy (keyboard hardware and OS jitter dominate). The dev server is now isolated by default (`COI=0` for measurement only). | accepted (P1 review, with conditions) | SPEC 4.1, 12.2 |
+| D-022 | Three participant kinds: `P-` real (refused until `real_collection_enabled` after ethics approval), `SYN-` synthetic, `DEV-` team testing (never used in results). | accepted (P1 approval) | SPEC 3 |
+| D-023 | Load only the Monaco contributions we need; text-inserting features are never loaded, not just switched off. | accepted (P1 approval) | SPEC 4.8 |
+| D-024 | P1 stores the client's `cause` hint; server-side canonical attribution is built in P3. Strengthened by D-026: reconciliation is mandatory. | accepted (P1 approval) | SPEC 4.7 |
+| D-025 | Study browsers: Chromium-based (Chrome, Edge) and Firefox only. Safari is out of scope. The same browser is required in both sittings. Browser brand and version are logged as covariates. | accepted (P1 review) | SPEC 1.3, 12.2 |
+| D-026 | Threat model: the browser owner can forge any client-side telemetry; `isTrusted` is not a defence; the hash chain covers only post-receipt tampering. **Server-side reconciliation of content deltas against keydowns is mandatory in P3**: an insertion without matching evidence (for example a large insert with no keydowns) is flagged whatever the client's label says. | accepted (lead, P1 review) | SPEC 1.2, 4.7, 9.2, 9.4, 13 |
+| D-027 | Find/replace: the replace toggle and row are hidden, and every Monaco replace shortcut is blocked by an enforced `blocked_keys` list (replacing the never-applied `disabled_commands`). A replace that still happens is labelled with the new cause `find_replace`. `unknown` and `find_replace` insertions are flags and count as untyped insertion. The schema's cause enum gains `find_replace` (additive; `schema_version` stays 1.0 because no real data exists). | accepted (lead instruction; mechanism proposed) | SPEC 4.7, 4.8, 11 |
+| D-028 | Field-encryption key location and backup. Today it is in `secrets/` inside the repo folder (git-ignored, never committed) with no backup. Proposed: move it outside the repo and sync, use `INTEGRITY_SECRETS_DIR`, add a backend guard, and keep one offline encrypted backup held by a named person. | open | SPEC 10.6 |
+| D-029 | The P2 TypeNet reproduction follows the protocol checked against arXiv:2101.05570v3 (Eq. 5 scoring, per-subject EER, k = 1,000, the paper's G grid) with the deviations listed in p2_protocol.md §9. `learning_rate` corrected from 0.005 to 0.05. | proposed | p2_protocol.md |
+| D-030 | The real-keyboard check page (`#/keycheck`) records locally and saves a file labelled `dataset: development`, `not_for_study: true`. It never talks to the server. Files live only under the data root, and the report refuses anything else. Team members only. | proposed | keycheck.md |
 
 ## Open
 
+- **D-028: where the field key lives and how it is backed up.** See SPEC 10.6.
+- **P2 modelling questions** (baseline at small G, scoring rule, recurrent dropout, TypeNet
+  Benchmark licence). See p2_protocol.md §12.
 - **Q4: data governance** (retention N, identity-map custodian, named responsible party, reviewers
   outside the team). Sent to the faculty guide as the governance one-pager
   (https://claude.ai/code/artifact/b8f7ee47-8b1a-4f57-bd0f-11e0c36d660b). It blocks the final

@@ -1,8 +1,8 @@
 # SPEC: Personalized Multi-Modal Integrity Scoring for Live Coding Exams
 
-Version 0.2, 2026-09-25. Course: BITE308L, VIT. Status: **Phase 0 approved with changes**
-(Q1, Q2, Q3 and Q5 decided; Q4 is with the faculty guide). Repository: `C:\dev\integrity-exam`,
-outside any cloud-synced folder. Python is pinned to 3.11.
+Version 0.3, 2026-09-26. Course: BITE308L, VIT. Status: **P0 and P1 approved; P2 started with
+the protocol write-up** ([p2_protocol.md](p2_protocol.md)). Q4 is with the faculty guide.
+Repository: `C:\dev\integrity-exam`, outside any cloud-synced folder. Python is pinned to 3.11.
 
 Markers used in this document:
 
@@ -40,10 +40,13 @@ than the reviewer queue.
   timing-forgery auto-typers.
 - Therefore the system fuses four signals: (1) keystroke identity distance, (2) process features
   from the edit stream, (3) AST drift normalised per problem, (4) clipboard and paste metrics.
-- Few-shot enrollment already exists in keystroke biometrics (TypeNet: about 4.5% EER at 1
-  enrollment sequence, 1.2% at 10, on English free text **[VERIFY]**). Our contribution is
-  code-domain adaptation, fusion, the calibration protocol, and an adversarial evaluation. We do
-  not claim more.
+- Few-shot enrollment already exists in keystroke biometrics. TypeNet reports 4.5% EER at 1
+  enrollment sequence and 1.2% at 10 (desktop, triplet loss, 70-keystroke sequences, **1,000 test
+  subjects**, EER averaged over per-subject thresholds, short memorised English sentences). These
+  figures are checked against arXiv:2101.05570v3, Table 2; the published version is [VERIFY]. The
+  168,000 figure is the dataset size, not the test set. See [p2_protocol.md](p2_protocol.md) §0.
+  Our contribution is code-domain adaptation, fusion, the calibration protocol, and an adversarial
+  evaluation. We do not claim more.
 - Population AI-code detectors fail across domains and under humanising **[VERIFY: needs a
   source in P6 or the sentence is dropped]**. AST drift is a weak signal used only in fusion.
 
@@ -51,9 +54,11 @@ Two more limits follow from the design:
 
 - $S$ only decides who goes to the review queue. It is not evidence of misconduct. "Auto-accept"
   means "not routed to review", not "certified honest".
-- The client is untrusted. Someone who modifies the page's JavaScript can forge telemetry. The hash
-  chain (§4.4) makes the log tamper-evident *after the server receives it*. It says nothing about
-  whether the client told the truth.
+- The client is untrusted. Whoever controls the browser (the student) can forge any client-side
+  telemetry: timings, key codes, `isTrusted`, change causes, snapshots and run results.
+  `isTrusted` is not a defence (§4.5). The hash chain (§4.4) shows tampering *after the data
+  reaches the server*, not forging at the source. Server-side reconciliation (§4.7, P3) raises the
+  cost of naive forging; it cannot stop a fully rewritten client.
 
 ### 1.3 Non-goals for v1
 
@@ -62,6 +67,7 @@ Two more limits follow from the design:
 - No detection of second devices except through behavioural traces inside the editor.
 - No authorship proof and no automated academic decision.
 - Python is the only exam language (tree-sitter-python). Other languages come later, if at all.
+- Safari is out of scope. The study browsers are Chromium-based (Chrome, Edge) and Firefox (D-025).
 
 ### 1.4 Known limitations, stated up front
 
@@ -78,7 +84,11 @@ Two more limits follow from the design:
   partly capture "typing while observed".
 - **Small, local sample.** 50+ volunteers from one university, with mostly similar keyboards and
   layouts. Results do not generalise to other populations without new data.
-- **Client-side trust.** See section 1.2: someone who controls the page can forge any telemetry.
+- **Client-side trust.** See section 1.2: someone who controls the browser can forge any telemetry,
+  and `isTrusted` does not stop an auto-typer.
+- **Timing is only as good as the browser's.** All P1 timing used injected keystrokes. Real-keyboard
+  behaviour (overlaps, auto-repeat, what `timeStamp` measures) is measured with the check in
+  [keycheck.md](keycheck.md). Its output is development data only.
 
 ---
 
@@ -150,6 +160,12 @@ features are computed by the same functions. The server never reimplements a fea
   without COOP/COEP, and checks whether `timeStamp` is the OS input time or the dispatch time. Every
   segment records its measured resolution (§4.9). The keystroke modality is marked unavailable for
   segments whose resolution is worse than `features.keystroke.max_timer_resolution_us`.
+- **Cross-origin isolation [DECIDED D-021].** The app is served with COOP/COEP by default (5–20 µs
+  timers instead of 100 µs–1 ms). Every enrollment and exam session in the study MUST use the same
+  setting. It is recorded per segment (`timer.cross_origin_isolated`), and a study session without
+  isolation is excluded from keystroke features. We make **no claim** that isolation improves
+  identity accuracy: keyboard hardware, OS input handling and scheduling jitter are much larger than
+  1 ms. P5 collection tooling enforces the setting (§13).
 
 ### 4.2 Transport, batching and ordering
 
@@ -253,11 +269,12 @@ Field notes:
   (layout-aware) and then drops `key`. The schema rejects events that contain it.
 - **`mods`** is a bitmask: 1 = Shift, 2 = Ctrl, 4 = Alt, 8 = Meta.
 - **`rep`** marks auto-repeat keydowns. They are excluded from timing features.
-- **`trusted`** is `event.isTrusted`. It catches synthetic events dispatched from page JavaScript.
-  It does **not** catch OS-level injection (AutoHotkey, xdotool, USB injectors) or CDP-driven
-  input. **Measured in P1:** Playwright-driven keystrokes report `isTrusted = true` in Chromium,
-  Firefox and WebKit, so browser-automation auto-typers (A2/A3) look trusted. OS-level injection on
-  Windows was not measured.
+- **`trusted`** is `event.isTrusted`. It catches only synthetic events dispatched from page
+  JavaScript by an unmodified page. **It is not a defence.** It does not catch OS-level injection
+  (AutoHotkey, xdotool, USB injectors) or CDP-driven input. The browser owner can also make it
+  report anything. **Measured in P1:** Playwright-driven keystrokes report `isTrusted = true` in
+  Chromium, Firefox and WebKit, so browser-automation auto-typers (A2/A3) look trusted. OS-level
+  injection on Windows was not measured. It is logged as weak evidence only.
 - **Lengths and offsets** are in **UTF-16 code units**, as Monaco reports them. The server's replay
   is UTF-16-aware and is tested with non-BMP characters.
 - **Lines and columns** are 1-based, as in Monaco.
@@ -296,12 +313,41 @@ P3**, where the features first consume it.
 | `drop` | follows a `drop` event |
 | `ime` | ends a `composition` |
 | `typed` | follows one non-modifier keydown in the same task, and either inserts at most 1 character, or is a deletion by Backspace/Delete, or is Enter/Tab inserting only whitespace (auto-indent) |
+| `find_replace` | the edit came from the find widget: focus is in it, or it was used after the last editor keydown [D-027]. Replace is disabled (§4.8), so this only appears if the policy was bypassed. |
 | `command` | follows a keydown with a Ctrl/Alt/Meta chord that ran an editor command: move line, copy line down, delete line, comment toggle, indent |
-| `other` | find/replace and any other known non-keystroke edit |
+| `other` | reserved for a future known non-keystroke edit; not emitted today |
 | `unknown` | nothing above matched |
 
-"Untyped insertion" means characters whose cause is `paste`, `drop`, `other` or `unknown`.
-`command` edits are internal rearrangements and are **not** untyped insertion. This matters for A7.
+"Untyped insertion" means characters whose cause is `paste`, `drop`, `find_replace`, `other` or
+`unknown`. `command` edits are internal rearrangements and are **not** untyped insertion. This
+matters for A7.
+
+**`unknown` is a flag, not noise [D-027].** An `unknown` change with `ins_len > 0` has no
+keystroke, paste or command behind it. It always counts as untyped insertion, appears as its own
+marker on the reviewer timeline, and is counted per session. Events with it are never dropped as
+noise. `find_replace` is treated the same way.
+
+**Server-side reconciliation is mandatory in P3 [D-026].** The client's `cause` is a hint that
+the browser owner can forge. The server recomputes the cause from the ordered log and checks every
+insertion against its evidence. The server's value is canonical, and every disagreement is
+counted and shown:
+
+- An insertion of n characters labelled `typed` needs matching character-producing editor
+  keydowns (auto-repeat included) since the previous change. The exception is auto-indent
+  whitespace after Enter or a colon.
+- An insertion labelled `paste` needs a `paste` event whose length matches.
+- An insertion labelled `command` needs a Ctrl/Alt/Meta chord keydown.
+- An insertion labelled `ime` needs a `composition` end.
+- An insertion with no matching evidence becomes **unexplained insertion**, whatever the client's
+  label says. The same goes for a large insert (§4.10) with no matching keydowns: it is flagged
+  even when the client says `typed`.
+- Session-wide, typed characters cannot exceed character-producing keydowns plus auto-indent
+  whitespace.
+
+This catches naive injection, such as `editor.setValue` from devtools, an extension writing into
+the page, or a forged label on pasted text. It cannot catch a client rewritten to forge keydowns
+and deltas consistently. Nor can it catch OS-level auto-typers (A2/A3), which produce real
+keydowns; timing and process features have to catch those.
 
 **Measured in P1** (details in [phase-reports/P1.md](phase-reports/P1.md)):
 
@@ -329,12 +375,24 @@ applied options differ from the policy, it sends `client_notice {code: policy_mi
 | Auto-indent | **on**, attributed as `typed` [PROPOSED D-005] | turning it off makes Python painful and hurts ecological validity; its output is predictable whitespace after Enter |
 | Line commands (move line, copy line down, comment toggle) | on, attributed as `command` | normal editing, needed for A7 |
 | Find | on | read-only |
-| Replace | Ctrl+H swallowed; the find widget's replace toggle is still clickable, and its edits arrive as `unknown` | non-keystroke insertion |
+| Replace | **off** [D-027]: the replace toggle and replace row are hidden, and every replace shortcut is blocked (`blocked_keys`). A replace that still happens is logged as `find_replace`. | non-keystroke insertion |
 
 **Stronger than switching off [D-023].** The client imports only the Monaco contributions it needs:
 clipboard, find, multicursor, line operations, comment, word operations, cursor undo and bracket
 matching. Suggest, snippets, inline completions, code actions, formatting, drop/paste-into, rename
 and the command palette are **never loaded**, so they cannot insert text whatever the options say.
+
+**Blocked keys [D-027].** `blocked_keys` in the policy lists key chords (code plus an exact set of
+modifiers) that a capture-phase listener on the editor stops before Monaco's handlers see them.
+The keydown is still logged. The list covers Monaco 0.57's replace shortcuts on Windows/Linux and
+macOS: Ctrl+H or Cmd+Alt+F opens replace; Ctrl/Cmd+Shift+1 replaces one match; Ctrl/Cmd+Alt+Enter
+replaces all. It also covers F1. It replaces the P1 `disabled_commands` list, which was never
+applied by the client.
+
+**Measured while fixing this (P2):** with the find widget open, Ctrl+Shift+1 and Ctrl+Alt+Enter
+replaced matches even with the replace row hidden. With an empty replace string this deletes the
+matches. Before D-027 these edits would have been labelled `command`, which is not untyped
+insertion. An end-to-end test now checks that they change nothing.
 
 **Measured in P1** (Monaco 0.57.0):
 
@@ -385,7 +443,7 @@ The results are in [phase-reports/P1.md](phase-reports/P1.md). Summary:
 
 | # | Question | Result |
 |---|---|---|
-| 1 | Timer resolution | 100 µs (Chromium) or 1 ms (Firefox, WebKit) without COOP/COEP; 5–20 µs with it. `timeStamp` semantics with **real** keyboards are not yet measured: Playwright input is synthetic. |
+| 1 | Timer resolution | 100 µs (Chromium) or 1 ms (Firefox, WebKit) without COOP/COEP; 5–20 µs with it. `timeStamp` semantics with **real** keyboards are not yet measured: Playwright input is synthetic. The real-keyboard check ([keycheck.md](keycheck.md)) measures them. |
 | 2 | Monaco options take effect | Yes (§4.8) |
 | 3 | Event order | keydown → content_change → keyup; `paste` after its change |
 | 4 | Multi-change order | end of document to start |
@@ -428,7 +486,9 @@ Keystroke $i$ is a non-repeat keydown with its matched keyup. A keyup matches th
 unmatched keydown with the same `code`, which handles rollover. Unmatched events are dropped and
 counted.
 
-Per keystroke, the TypeNet-style vector is **[VERIFY-P2 against the paper]**:
+Per keystroke, the TypeNet vector is below. Checked against TypeNet §4.1: keycode ÷ 255, and the
+four latencies in seconds. Pairing and latencies are implemented in
+`ml/src/integrity_ml/keystroke.py`.
 
 | Feature | Definition |
 |---|---|
@@ -438,10 +498,13 @@ Per keystroke, the TypeNet-style vector is **[VERIFY-P2 against the paper]**:
 | IL (release-press, "up-to-down flight") | $\text{down}_{i+1} - \text{up}_i$ (negative under rollover) |
 | RL (release-release) | $\text{up}_{i+1} - \text{up}_i$ |
 
-Latencies are clipped to `features.keystroke.latency_clip_ms`.
+Latencies are clipped to `features.keystroke.latency_clip_ms` on our data. TypeNet does not clip,
+so the D1 reproduction doesn't either ([p2_protocol.md](p2_protocol.md) §3).
 
-- **Windows.** $M$ = 70 keystrokes (50 as an ablation), the plateau region reported for TypeNet
-  **[VERIFY]**. Enrollment windows do not overlap. Exam windows slide with stride 35.
+- **Windows.** $M$ = 70 keystrokes (50 as an ablation). TypeNet §6.1 reports no significant gain
+  beyond M = 70. But its sequences are single sentences of about 70 characters, zero-padded, so
+  its plateau may reflect sentence length rather than typing (our inference). Enrollment windows
+  do not overlap. Exam windows slide with stride 35.
 - **Scope.** Only `target = editor` keystrokes count. Modifier keys are included by default
   (config switch).
 - **Digraph latencies** for the non-deep baseline: median PL per ordered `code` pair, and median
@@ -520,9 +583,13 @@ signal.
 
 ### 7.1 Keystroke encoder [BRIEF]
 
-- **Architecture.** A TypeNet-style Siamese network. Input is $M \times 5$ per window. Two LSTM
-  layers of 128 units, a 128-d embedding and triplet loss. Dropout, batch-norm placement and
-  triplet margin follow the paper **[VERIFY-P2]** and are recorded in `config/models.yaml`.
+- **Architecture.** A TypeNet-style Siamese network. Input is $M \times 5$ per window. Masking →
+  batch norm → LSTM(128) → batch norm + dropout 0.5 → LSTM(128), whose final state is the 128-d
+  embedding. The paper also uses recurrent dropout 0.2. Training uses triplet loss on squared
+  distances, margin 1.5, random triplets, Adam with learning rate 0.05, and 200 epochs of 150
+  batches of 512. All of this is checked against TypeNet §4.2–4.4. The layer order is confirmed by
+  the paper's 200,458-parameter count. Values are in `config/models.yaml`; deviations are in
+  [p2_protocol.md](p2_protocol.md) §9.
 - **Pretraining.** Aalto 136M-keystroke desktop dataset. **Blocked until the lead confirms the
   licence and downloads it.** Pretraining can be subsampled if the RTX 3050 (6 GB) budget requires
   it; any subsampling is reported.
@@ -541,6 +608,10 @@ are shared, the baseline is unavailable.
 - **Prototype.** $c_u = \frac{1}{G}\sum_{g=1}^{G} f(w_g)$, the mean embedding over $G$ enrollment
   windows from the practice modules.
 - **Distance.** $d_{ks}(w) = \lVert f(w) - c_u \rVert_2$.
+- **[OPEN, P2 question 2]** TypeNet scores differently: it averages the distances to each
+  enrollment embedding, $\frac{1}{G}\sum_g \lVert f(w) - f(w_g) \rVert$ (Eq. 5). The P2
+  reproduction uses Eq. 5. For our data, the proposal is to pre-register both rules, with Eq. 5
+  primary.
 - **Report.** EER against $G \in \{1, 3, 5, 10\}$ for both the encoder and the digraph baseline.
 - **Minimum.** The keystroke modality is unavailable for a participant with fewer than
   `models.enrollment.g_min` (5) valid enrollment windows.
@@ -700,7 +771,9 @@ reviewer as its own queue.
 
 - The server and database host are trusted.
 - The signing key is held separately from database credentials.
-- The client and the network before TLS termination are **untrusted**.
+- The client and the network before TLS termination are **untrusted**. The browser owner (the
+  student) controls the client and can forge any telemetry it sends, including `isTrusted`, change
+  causes, timings and run results [D-026].
 - Reviewers are trusted but audited.
 
 ### 9.3 Attack catalogue and expected signals
@@ -725,7 +798,7 @@ reviewer as its own queue.
 |---|---|
 | Impersonation (another person types the exam) | This is where keystroke identity is strongest. |
 | Enrollment impersonation (someone else does the practice modules) | Not detectable by design. The baseline must be collected under supervision or with low stakes. Stated as a limitation. |
-| Client tampering: modified JS, forged or replayed telemetry, devtools injection | **Out of scope** for detection. `isTrusted`, replay consistency and the hash chain only raise the cost. |
+| Client tampering by the browser owner: modified JS, forged or replayed telemetry, devtools injection, extensions writing into the page [D-026] | Forged telemetry cannot be detected from its content alone. **`isTrusted` is not a defence.** The hash chain covers only what happens after the data reaches the server. What raises the cost: **mandatory P3 server-side reconciliation** of content deltas against keydowns (§4.7), where an unexplained insertion is flagged whatever the client's label says; replay consistency against snapshots (§4.10); and the editor policy's blocked keys (§4.8). A client rewritten to forge keydowns and deltas consistently still evades all of these. |
 | Insider misuse of data | Least privilege, pseudonyms only, access log, erasure. |
 
 ### 9.5 Out of scope for v1
@@ -819,8 +892,19 @@ same information as the code itself, and it is disclosed in the notice.
 
 - **At rest [DECIDED Q1].** Application-level AES-256-GCM on `events.data` (P1), and later on
   snapshots, review notes and appeal notes. The associated data is `session_id‖server_seq`, so a
-  ciphertext cannot be moved to another row undetected. The key comes from `secrets/`, never from
-  the repo. The database lives in a Docker named volume, not in the repository.
+  ciphertext cannot be moved to another row undetected. The database lives in a Docker named
+  volume, not in the repository.
+- **Where the field key is today [OPEN, D-028].** `data_key.bin` (32 random bytes from
+  `scripts/make_secrets.py`) sits in `C:\dev\integrity-exam\secrets\`. That is **inside the
+  repository folder**. It is git-ignored and has never been committed (only `secrets/README.md` is
+  tracked). The folder is not under OneDrive (`C:\Users\…\OneDrive`), but it is still in the repo.
+  **There is no backup.** If the file is lost, every encrypted event payload becomes unreadable.
+  Today that affects only DEV and SYN data. The requirement is that the key is in neither the repo
+  nor a synced folder. The proposed fix: move `secrets/` to a folder outside the repo and outside
+  sync; point `INTEGRITY_SECRETS_DIR` at it (the backend already reads this variable); make the
+  backend refuse a secrets folder inside the repo or a sync root, as it already does for the data
+  root; and keep one offline encrypted backup held by a named person. This waits for the lead's
+  decision.
 - **Data root [DECIDED Q1].** Exported datasets and files live under `INTEGRITY_DATA_ROOT`, outside
   the repository, and are written encrypted. The disk should also be encrypted (BitLocker or Device
   Encryption). As of P0 this machine's disk-encryption status is **unknown**: the check needs admin
@@ -887,7 +971,9 @@ Shown on the consent screen, the dashboard and in every report:
 
 - **Session timeline.** $\tilde S(t)$ with the threshold. Markers for pastes (coloured by
   provenance), large inserts, AST jumps, pauses > 2 s, focus losses, runs, `replay_mismatch` and
-  `unclean_end`.
+  `unclean_end`. Also markers for `unknown` and `find_replace` insertions, and for the server's
+  **unexplained insertions** and client/server cause disagreements (§4.7), each with a
+  per-session count.
 - **Per-tick evidence.** Clicking a tick shows each modality's contribution ($w_j x_j$), so the
   reviewer sees *why*.
 - **Replay scrubber.** Code state at any `server_seq`, replayed from deltas and checked against
@@ -905,7 +991,8 @@ Shown on the consent screen, the dashboard and in every report:
 
 | ID | Data | Use |
 |---|---|---|
-| D1 | Aalto 136M keystrokes, desktop **[VERIFY licence; lead confirms and downloads]** | encoder pretraining; P2 TypeNet reproduction |
+| D1 | Aalto 136M keystrokes, desktop (Dhakal et al.): 15 memorised sentences per subject, typed in a browser with ms timing (TypeNet §3). **[Licence requested by the lead; redistribution and patent-relevant terms to be checked by the lead]** | encoder pretraining; P2 TypeNet reproduction ([p2_protocol.md](p2_protocol.md)) |
+| D1b | *Optional:* TypeNet Benchmark, the authors' triplet embeddings (M = 50) for the 100,000 desktop test subjects, under a separate BiDA Lab licence. Not requested. | checks our EER code against the authors' own embeddings (P2 question 4) |
 | D2 | Our collection: recruit 50+ consenting adult students so that 30–50 complete both sittings; code-typing, with study conditions | fine-tuning, fusion, calibration, evaluation |
 | D3 | **Synthetic**, labelled | pipeline tests only; never reported as results |
 
@@ -913,7 +1000,13 @@ Shown on the consent screen, the dashboard and in every report:
 
 - **Ethics gate.** No real collection before institutional ethics approval and the P5 ethics and
   consent checklist.
-- **Recruitment.** 50+ participants, allowing for dropout between sittings.
+- **Recruitment.** 50+ participants, allowing for 20–30% dropout between sittings.
+- **Browsers [DECIDED D-025].** Chromium-based (Chrome or Edge) or Firefox. Safari is out of
+  scope. Each participant uses **the same browser in both sittings**. Browser brand and version are
+  logged as covariates; `browser_family`/`browser_major` are logged today, and brand, which tells
+  Edge from Chrome, is added in P5.
+- **Cross-origin isolation [DECIDED D-021].** The same setting (isolated) for every enrollment and
+  exam session.
 - **Sitting 1 (~40 min).**
   1. Consent, then the device questionnaire.
   2. Three practice modules. Each has (a) about 2 min of transcribing given code, which gives
@@ -1017,6 +1110,8 @@ user for testing without leakage.
 - **Acceptance [DECIDED Q5].** Our EER at each $G$ is within max(1 percentage point absolute, 50%
   relative) of the published value under the same protocol, or a written gap analysis explains the
   difference.
+- **Status.** Written: [p2_protocol.md](p2_protocol.md) v0.1 (all 8 items, the deviations and the
+  acceptance bands). It awaits the lead's review. No training has started.
 
 ---
 
@@ -1026,10 +1121,10 @@ user for testing without leakage.
 |---|---|---|
 | P0 | Repo skeleton, this spec, decisions log | Lead approves the spec; skeleton tests pass |
 | P1 | Capture app, server log, replay | All §4.5 events captured. Ordering tests: duplicate, out-of-order and reconnect/resend give gapless `server_seq` in `client_seq` order. Hash-chain tests (plain chain, no signatures): every single-field edit, insert, delete and reorder is detected, and close returns the head hash. Data-root guard and field encryption tested. Replay equals every snapshot (non-BMP text, undo/redo, multi-cursor). Playwright end-to-end: consent → practice → type → paste → submit → replay matches. §4.11 measurements reported. |
-| P2 | Keystroke features, digraph baseline, TypeNet-style encoder on D1 | EER reproduced per §12.7, or the gap explained |
-| P3 | Enrollment, process, AST and clipboard features, fusion, thresholds | Every feature unit-tested; weight-sign guard passes; ticks under 50 ms; calibration curves on synthetic (labelled) and, once available, validation data |
+| P2 | Protocol write-up (approved before training); keystroke features; non-deep baseline (first on labelled synthetic data, then on D1); TypeNet-style encoder on D1; real-keyboard check | EER reproduced per §12.7, or the gap explained. The baseline is reported under the same protocol. The real-keyboard check report is reviewed (development data only). |
+| P3 | Enrollment, process, AST and clipboard features, fusion, thresholds, **server-side cause reconciliation** [D-026] | Every feature unit-tested; weight-sign guard passes; ticks under 50 ms; calibration curves on synthetic (labelled) and, once available, validation data. Reconciliation tests: a forged batch whose large insert is labelled `typed` with no keydowns is flagged as unexplained insertion; a `paste` label with no paste event is flagged; genuine typing, auto-indent, line commands and pastes produce no flags; client/server disagreements are counted. |
 | P4 | Dashboard and reviewer workflow | Timeline, replay, decisions, appeals, access log. Playwright tests. Every read is logged. |
-| P5 | Ethics checklist (approved **before** any real collection), collection tooling, evaluation harness, attack report | §12 complete. Report per attack with CIs and time-to-detection. Ablations. |
+| P5 | Ethics checklist (approved **before** any real collection), collection tooling, evaluation harness, attack report | §12 complete. Report per attack with CIs and time-to-detection. Ablations. The collection tooling serves the app cross-origin isolated and refuses a real session that isn't; it logs browser brand and version, refuses a second sitting in a different browser (D-021, D-025), and refuses any file labelled `dataset: development`. |
 | P6 | Paper and patent-support documents | Honest claims, novelty statement, limitations, and every citation verified or flagged |
 
 Every phase ends with: what works, what is weak, and what the lead should decide next.
@@ -1059,20 +1154,28 @@ See [DECISIONS.md](DECISIONS.md) for the full log.
 | Q3: study protocol | **Decided with changes.** 50+ recruited; live-LLM A5 subset of 8–10; role-play and transcription-awareness limitations (§1.4); ethics approval before collection. |
 | Q4: data governance | **Open.** With the faculty guide via the governance one-pager: retention N, identity-map custodian, named responsible party, reviewers outside the team. |
 | Q5: evaluation | **Decided with changes.** Nested user-level CV; cluster bootstrap over users; exact TypeNet protocol documented before P2 training (§12.7). |
+| P1 review | **Decided.** COOP/COEP by default, the same for all sessions, no accuracy claim (D-021). Chromium and Firefox only, same browser both sittings (D-025). Threat-model additions and mandatory P3 reconciliation (D-026). Replace disabled, `unknown` is a flag (D-027). Aalto licence requested by the lead. |
+| Field-key location and backup | **Open (D-028).** The key is inside the repo folder with no backup (§10.6). |
+| P2 modelling questions | **Open.** Four questions in [p2_protocol.md](p2_protocol.md) §12. |
 
 ---
 
-## 16. References [ALL VERIFY in P6]
+## 16. References [VERIFY in P6 unless marked checked]
 
-None of these has been checked against the source yet. Numbers attributed to them come from the
-project brief.
+Reference 1 was checked against its arXiv text in P2. The others have not been checked against
+the source yet; numbers attributed to them come from the project brief.
 
 1. A. Acien, A. Morales, J. V. Monaco, R. Vera-Rodriguez, J. Fierrez. "TypeNet: Deep Learning
-   Keystroke Biometrics." *IEEE Transactions on Biometrics, Behavior, and Identity Science*
-   (2021/2022). **[VERIFY: venue, year, EER at G = 1 and G = 10, the 50–70 keystroke plateau,
-   architecture details]**
+   Keystroke Biometrics." *IEEE Transactions on Biometrics, Behavior, and Identity Science*.
+   **Checked (2026-09-26) against arXiv:2101.05570v3**: the EERs (Table 2), the M = 70 plateau
+   (§6.1), the architecture (§4.2) and the training and evaluation protocol (§4.4, §5.1); details
+   in [p2_protocol.md](p2_protocol.md). **[VERIFY]** the published version: arXiv says "T-BIOM,
+   2021"; the authors' README says vol. 4, pp. 57–70, 2022. The IJCB 2020 preliminary version is
+   arXiv:2004.03627.
 2. V. Dhakal, A. M. Feit, P. O. Kristensson, A. Oulasvirta. "Observations on Typing from 136
-   Million Keystrokes." *CHI 2018.* **[VERIFY; dataset licence to be confirmed by the lead]**
+   Million Keystrokes." *CHI 2018.* **[VERIFY; dataset licence requested by the lead]** Check
+   especially whether each subject's 15 sentences were typed in one sitting
+   ([p2_protocol.md](p2_protocol.md) §0.1).
 3. Digital Personal Data Protection Act, 2023 (India). **[VERIFY sections]**
 4. Digital Personal Data Protection Rules, 2025 (India). **[VERIFY rule numbers and dates]**
 5. Tree-sitter and tree-sitter-python (software). Monaco Editor (software). Versions pinned in the

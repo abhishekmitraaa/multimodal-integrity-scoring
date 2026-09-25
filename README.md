@@ -18,16 +18,22 @@ The full design is in [docs/SPEC.md](docs/SPEC.md) and decisions are logged in
   timing-forgery auto-typers.
 - Therefore the system fuses four signals: (1) keystroke identity distance, (2) process features from
   the edit stream, (3) AST drift normalised per problem, (4) clipboard and paste metrics.
-- Few-shot enrollment already exists in keystroke biometrics (TypeNet reports about 4.5% EER at 1
-  enrollment sequence and 1.2% at 10, on English free text; the figures are to be checked against
-  the paper). Our contribution is code-domain adaptation, fusion, the calibration protocol and an
-  adversarial evaluation. We do not claim more.
+- Few-shot enrollment already exists in keystroke biometrics. TypeNet reports 4.5% EER at 1
+  enrollment sequence and 1.2% at 10, for 70-keystroke sequences of short memorised English
+  sentences, 1,000 test subjects and per-subject thresholds. The figures are checked against the
+  arXiv text; see [docs/p2_protocol.md](docs/p2_protocol.md). Our contribution is code-domain
+  adaptation, fusion, the calibration protocol and an adversarial evaluation. We do not claim
+  more.
 - Population AI-code detectors fail across domains and under humanising (a source is required by
   Phase 6). AST drift is a weak signal used only in fusion.
 - A low score means "a human should look". It is not evidence of misconduct. Accessibility needs,
   injury, fatigue, mood and keyboard or device changes all cause false flags.
-- The browser client is untrusted. The hash-chained log is tamper-evident on the server. It cannot
-  prove what an altered client sent.
+- The score S is defined so that high = genuine. The fusion inputs are anomaly distances, so their
+  learned weights are constrained to be non-positive.
+- Client-side telemetry can be forged by whoever controls the browser, and `isTrusted` is not a
+  defence. The hash chain shows tampering after data reaches the server, not forging at the source.
+  Server-side reconciliation of edits against keystrokes (Phase 3) raises the cost of naive
+  forging only.
 
 ## Repository layout
 
@@ -47,8 +53,8 @@ The full design is in [docs/SPEC.md](docs/SPEC.md) and decisions are logged in
 | Phase | Scope | Status |
 |---|---|---|
 | P0 | Repo skeleton and spec | approved with changes |
-| P1 | Capture app, server log, replay | done, awaiting approval ([report](docs/phase-reports/P1.md)) |
-| P2 | Keystroke features and baseline model on public data | not started; Aalto licence pending |
+| P1 | Capture app, server log, replay | approved ([report](docs/phase-reports/P1.md)) |
+| P2 | Keystroke features and baseline model on public data | protocol written, awaiting review ([p2_protocol.md](docs/p2_protocol.md)); real-keyboard check ready ([keycheck.md](docs/keycheck.md)); Aalto licence requested; no training yet |
 | P3 | Enrollment, process/AST/clipboard features, fusion, thresholds | not started |
 | P4 | Reviewer dashboard | not started |
 | P5 | Data collection tooling, evaluation harness, attack report | not started; ethics checklist first |
@@ -74,13 +80,14 @@ cd frontend && npm install && npx playwright install chromium firefox webkit
 $env:INTEGRITY_DATA_ROOT = "C:\integrity-data"      # must be outside the repo and cloud sync
 .venv\Scripts\python -m alembic -c backend\alembic.ini upgrade head
 .venv\Scripts\python -m integrity_backend.app
-# terminal 2: the web app on :5173 ($env:COI = "1" first to serve it cross-origin isolated)
+# terminal 2: the web app on :5173, cross-origin isolated by default ($env:COI = "0" only to measure without)
 cd frontend; npm run dev
 ```
 
 Open http://127.0.0.1:5173. It creates `DEV-` participants. Real participants are refused until
 `real_collection_enabled` is set after ethics approval. The reviewer replay page is at `#/replay`,
-using the token in `secrets/reviewer_token.txt`.
+using the token in `secrets/reviewer_token.txt`. The real-keyboard check is at `#/keycheck`. It needs
+only the web app, not the backend, and its files are development data ([docs/keycheck.md](docs/keycheck.md)).
 
 ## Running the tests
 
