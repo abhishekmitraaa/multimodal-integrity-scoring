@@ -1,0 +1,4 @@
+# Tools for the repo-wide contract tests (tests/). Package deps live in each pyproject.toml.
+pytest>=8
+PyYAML>=6
+jsonschema>=4.18

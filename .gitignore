@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+frontend/test-results/
+frontend/playwright-report/
+
+# Secrets: never commit
+secrets/*
+!secrets/README.md
+.env
+
+# Data: only small labelled synthetic fixtures are committed
+data/*
+!data/README.md
+!data/synthetic/
+data/synthetic/*
+!data/synthetic/.gitkeep
+
+# Model artifacts and eval outputs
+ml/artifacts/
+eval/results/
+eval/ledger/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

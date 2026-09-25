@@ -1,0 +1,13 @@
+# Repo-wide tool configuration only. Each package has its own pyproject.toml.
+[tool.pytest.ini_options]
+testpaths = ["tests", "backend/tests", "ml/tests", "eval/tests"]
+pythonpath = ["backend/src", "ml/src", "eval/src"]
+addopts = "-ra --import-mode=importlib"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true

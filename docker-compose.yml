@@ -1,0 +1,19 @@
+# P0: database only. The backend and frontend services are added in P1.
+# NOT YET RUN: Docker Desktop was not running during Phase 0.
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: integrity
+      POSTGRES_USER: integrity
+      POSTGRES_PASSWORD_FILE: /run/secrets/pg_password
+    secrets: [pg_password]
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]   # named volume: lives in Docker's VM, not in OneDrive
+
+secrets:
+  pg_password:
+    file: ./secrets/pg_password.txt
+
+volumes:
+  pgdata:
