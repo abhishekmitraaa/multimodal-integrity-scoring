@@ -70,9 +70,9 @@ cd frontend && npm install && npx playwright install chromium firefox webkit
 ## Running the app locally (development data only)
 
 ```powershell
-# terminal 1 (PowerShell): database schema, then the API on :8000
-.venv\Scripts\python -m alembic -c backend\alembic.ini upgrade head
+# terminal 1 (PowerShell): data root, database schema, then the API on :8000
 $env:INTEGRITY_DATA_ROOT = "C:\integrity-data"      # must be outside the repo and cloud sync
+.venv\Scripts\python -m alembic -c backend\alembic.ini upgrade head
 .venv\Scripts\python -m integrity_backend.app
 # terminal 2: the web app on :5173 ($env:COI = "1" first to serve it cross-origin isolated)
 cd frontend; npm run dev
