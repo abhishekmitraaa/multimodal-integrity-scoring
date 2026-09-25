@@ -1,0 +1,15 @@
+# Online scoring and decision states. See docs/SPEC.md section 8.
+tick:
+  every_keydowns: 35
+  on_types: [paste, cut, drop, large_insert, ast_change]
+  max_interval_s: 30
+smoothing:
+  kind: ewma_logit
+  lambda: 0.5
+session_score: min_smoothed
+target_false_flag_rate: 0.05     # [BRIEF] tau set on validation genuine sessions only
+states: [auto_accept, review, insufficient_data]
+insufficient:
+  max_unavailable_tick_frac: 0.5
+  require_enrollment: true
+latency_budget_ms: 50

@@ -1,0 +1,16 @@
+# Client capture and server ingest. See docs/SPEC.md section 4.
+schema_version: "1.0"
+batch:
+  max_keydowns: 15            # [BRIEF] flush after 15 keystrokes
+  max_age_ms: 5000            # [BRIEF] or after 5 s
+  max_events: 500             # hard cap per batch (schema maxItems)
+  priority_flush_types: [paste, cut, copy, drop, blur, visibility, run, submit, segment_end]
+resend_timeout_ms: 3000
+client_buffer_max_events: 20000
+clock_sync_interval_ms: 30000
+checkpoint_every_events: 500
+snapshot:
+  interval_ms: 10000          # timer snapshot if the model version changed
+  large_insert_min_chars: 32  # UTF-16 code units, any cause
+  large_insert_min_lines: 2   # newlines in a single change
+cursor_event_throttle_ms: 250

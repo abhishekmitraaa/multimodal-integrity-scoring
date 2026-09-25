@@ -1,0 +1,3 @@
+# Global settings shared by every package. See docs/SPEC.md section 14.
+seed: 20260925
+python_version: "3.11"

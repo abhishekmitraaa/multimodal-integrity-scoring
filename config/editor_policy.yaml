@@ -1,0 +1,36 @@
+# Monaco editor options served to the client, hashed and logged per segment.
+# Goal: no text enters the editor without a logged keystroke or clipboard event.
+# [VERIFY-P1] every option name is checked against the pinned Monaco version by a Playwright test.
+policy_id: policy-v1
+monaco_options:
+  quickSuggestions: false
+  suggestOnTriggerCharacters: false
+  wordBasedSuggestions: "off"
+  acceptSuggestionOnEnter: "off"
+  acceptSuggestionOnCommitCharacter: false
+  tabCompletion: "off"
+  snippetSuggestions: "none"
+  parameterHints: {enabled: false}
+  inlineSuggest: {enabled: false}      # no AI / inline completion
+  autoClosingBrackets: "never"
+  autoClosingQuotes: "never"
+  autoClosingDelete: "never"
+  autoClosingOvertype: "never"
+  autoSurround: "never"
+  autoIndent: "advanced"               # kept on, attributed as typed (D-005)
+  formatOnType: false
+  formatOnPaste: false
+  dragAndDrop: false
+  dropIntoEditor: {enabled: false}
+  pasteAs: {enabled: false}
+  linkedEditing: false
+  codeLens: false
+  lightbulb: {enabled: "off"}
+  contextmenu: false
+  emptySelectionClipboard: false
+  copyWithSyntaxHighlighting: false
+disabled_commands:                     # removed from keybindings
+  - editor.action.quickCommand         # command palette (F1)
+  - editor.action.startFindReplaceAction
+  - editor.action.triggerSuggest
+  - editor.action.formatDocument

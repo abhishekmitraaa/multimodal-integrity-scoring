@@ -1,0 +1,210 @@
+{
+  "schema_version": "1.0",
+  "session_id": "5f0c9a1e-3b7d-4c2a-9e41-0a6b2d8f7c11",
+  "epoch": 0,
+  "batch_seq": 0,
+  "events": [
+    {
+      "client_seq": 0,
+      "type": "segment_start",
+      "t_client_us": 5000,
+      "data": {
+        "time_origin_unix_us": 1758800000000000,
+        "page": "practice",
+        "problem_id": "synthetic_p1",
+        "editor_policy_id": "policy-v1",
+        "editor_policy_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "device": {
+          "os_family": "windows",
+          "browser_family": "chromium",
+          "browser_major": 0,
+          "layout": "synthetic",
+          "layout_source": "unknown",
+          "keyboard_type": "unknown",
+          "screen_w": 1920,
+          "screen_h": 1080,
+          "dpr_x100": 100
+        },
+        "timer": {
+          "resolution_us": 100,
+          "cross_origin_isolated": false
+        },
+        "synthetic": true
+      }
+    },
+    {
+      "client_seq": 1,
+      "type": "keydown",
+      "t_client_us": 1000000,
+      "data": {
+        "code": "KeyX",
+        "cat": "letter",
+        "rep": false,
+        "mods": 0,
+        "trusted": true,
+        "composing": false,
+        "target": "editor",
+        "line": 1,
+        "col": 1
+      }
+    },
+    {
+      "client_seq": 2,
+      "type": "content_change",
+      "t_client_us": 1000400,
+      "data": {
+        "version_id": 2,
+        "idx": 0,
+        "n": 1,
+        "offset": 0,
+        "del_len": 0,
+        "ins_len": 1,
+        "text": "x",
+        "start_line": 1,
+        "start_col": 1,
+        "end_line": 1,
+        "end_col": 1,
+        "cause": "typed",
+        "undo": false,
+        "redo": false,
+        "flush": false
+      }
+    },
+    {
+      "client_seq": 3,
+      "type": "keyup",
+      "t_client_us": 1085000,
+      "data": {
+        "code": "KeyX",
+        "cat": "letter",
+        "rep": false,
+        "mods": 0,
+        "trusted": true,
+        "composing": false,
+        "target": "editor",
+        "line": 1,
+        "col": 2
+      }
+    },
+    {
+      "client_seq": 4,
+      "type": "keydown",
+      "t_client_us": 1210000,
+      "data": {
+        "code": "Equal",
+        "cat": "symbol",
+        "rep": false,
+        "mods": 0,
+        "trusted": true,
+        "composing": false,
+        "target": "editor",
+        "line": 1,
+        "col": 2
+      }
+    },
+    {
+      "client_seq": 5,
+      "type": "content_change",
+      "t_client_us": 1210400,
+      "data": {
+        "version_id": 3,
+        "idx": 0,
+        "n": 1,
+        "offset": 1,
+        "del_len": 0,
+        "ins_len": 1,
+        "text": "=",
+        "start_line": 1,
+        "start_col": 2,
+        "end_line": 1,
+        "end_col": 2,
+        "cause": "typed",
+        "undo": false,
+        "redo": false,
+        "flush": false
+      }
+    },
+    {
+      "client_seq": 6,
+      "type": "keyup",
+      "t_client_us": 1295000,
+      "data": {
+        "code": "Equal",
+        "cat": "symbol",
+        "rep": false,
+        "mods": 0,
+        "trusted": true,
+        "composing": false,
+        "target": "editor",
+        "line": 1,
+        "col": 3
+      }
+    },
+    {
+      "client_seq": 7,
+      "type": "keydown",
+      "t_client_us": 1420000,
+      "data": {
+        "code": "Digit1",
+        "cat": "digit",
+        "rep": false,
+        "mods": 0,
+        "trusted": true,
+        "composing": false,
+        "target": "editor",
+        "line": 1,
+        "col": 3
+      }
+    },
+    {
+      "client_seq": 8,
+      "type": "content_change",
+      "t_client_us": 1420400,
+      "data": {
+        "version_id": 4,
+        "idx": 0,
+        "n": 1,
+        "offset": 2,
+        "del_len": 0,
+        "ins_len": 1,
+        "text": "1",
+        "start_line": 1,
+        "start_col": 3,
+        "end_line": 1,
+        "end_col": 3,
+        "cause": "typed",
+        "undo": false,
+        "redo": false,
+        "flush": false
+      }
+    },
+    {
+      "client_seq": 9,
+      "type": "keyup",
+      "t_client_us": 1505000,
+      "data": {
+        "code": "Digit1",
+        "cat": "digit",
+        "rep": false,
+        "mods": 0,
+        "trusted": true,
+        "composing": false,
+        "target": "editor",
+        "line": 1,
+        "col": 4
+      }
+    },
+    {
+      "client_seq": 10,
+      "type": "snapshot",
+      "t_client_us": 1630000,
+      "data": {
+        "version_id": 4,
+        "reason": "timer",
+        "len": 3,
+        "sha256": "1f206b11c23e28cc250ded7fc0098d3823a8467a54340f1ac4e535cb8544493f",
+        "text": "x=1"
+      }
+    }
+  ]
+}

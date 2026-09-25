@@ -1,0 +1,30 @@
+# Models. See docs/SPEC.md section 7. Values marked VERIFY come from TypeNet and must be checked in P2.
+keystroke_encoder:
+  kind: typenet_lstm
+  input_features: 5              # keycode, HL, IL, PL, RL  [VERIFY]
+  lstm_layers: 2                 # [BRIEF]
+  hidden_units: 128              # [BRIEF]
+  embedding_dim: 128             # [BRIEF]
+  dropout: 0.5                   # [VERIFY]
+  loss: triplet                  # [BRIEF]
+  triplet_margin: 1.5            # [VERIFY]
+  optimizer: adam
+  learning_rate: 0.005           # [VERIFY]
+  batch_size: 512
+  max_epochs: 200
+  pretrain_dataset: aalto_desktop   # blocked on licence confirmation
+digraph_baseline:
+  min_occurrences: 3
+  min_shared_items: 5
+  distance: manhattan
+enrollment:
+  g_values: [1, 3, 5, 10]        # [BRIEF]
+  g_min: 5
+fusion:
+  model: logistic_regression     # [BRIEF] MLP only if ablation shows gain
+  penalty: l2
+  c_grid: [0.01, 0.1, 1.0, 10.0]
+  inputs: [d_ks, d_proc, d_ast_h, d_ast_s, clip_ext_frac, clip_ext_chars_log, focus_loss_frac]
+  availability_indicators: [ks_available, ast_available]
+  impute: genuine_train_median
+  mlp_enabled: false

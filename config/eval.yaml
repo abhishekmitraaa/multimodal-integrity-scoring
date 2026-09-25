@@ -1,0 +1,13 @@
+# Evaluation. See docs/SPEC.md section 12.
+split:
+  scheme: nested_user_cv         # [PROPOSED D-008]
+  outer_folds: 5
+  inner_val_frac: 0.25
+  repeats_seeds: [1, 2, 3]
+bootstrap:
+  resamples: 10000
+  unit: participant
+  ci: 0.95
+false_flag_rate: 0.05
+attacks: [A1, A2, A3a, A3b, A4, A5, A6, A7, A8]
+test_ledger: eval/ledger/test_access.jsonl

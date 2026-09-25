@@ -1,0 +1,210 @@
+{
+  "schema_version": "1.0",
+  "session_id": "9d2e4b7a-6c1f-4e8b-a3d5-7f0e1c2b9a44",
+  "epoch": 0,
+  "batch_seq": 0,
+  "events": [
+    {
+      "client_seq": 0,
+      "type": "segment_start",
+      "t_client_us": 4000,
+      "data": {
+        "time_origin_unix_us": 1758800000000000,
+        "page": "exam",
+        "problem_id": "synthetic_e1",
+        "editor_policy_id": "policy-v1",
+        "editor_policy_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "device": {
+          "os_family": "windows",
+          "browser_family": "chromium",
+          "browser_major": 0,
+          "layout": "synthetic",
+          "layout_source": "unknown",
+          "keyboard_type": "unknown",
+          "screen_w": 1920,
+          "screen_h": 1080,
+          "dpr_x100": 100
+        },
+        "timer": {
+          "resolution_us": 100,
+          "cross_origin_isolated": false
+        },
+        "synthetic": true
+      }
+    },
+    {
+      "client_seq": 1,
+      "type": "copy",
+      "t_client_us": 900000,
+      "data": {
+        "source": "problem_panel",
+        "len": 9,
+        "sha256": "4e1c3ce94816c0f6403b34990a83aaeff4249fd494c451b5afbf9fb3bbbd30a4"
+      }
+    },
+    {
+      "client_seq": 2,
+      "type": "blur",
+      "t_client_us": 1000000,
+      "data": {
+        "target": "window"
+      }
+    },
+    {
+      "client_seq": 3,
+      "type": "visibility",
+      "t_client_us": 1000500,
+      "data": {
+        "state": "hidden"
+      }
+    },
+    {
+      "client_seq": 4,
+      "type": "visibility",
+      "t_client_us": 19000000,
+      "data": {
+        "state": "visible"
+      }
+    },
+    {
+      "client_seq": 5,
+      "type": "focus",
+      "t_client_us": 19000300,
+      "data": {
+        "target": "window"
+      }
+    },
+    {
+      "client_seq": 6,
+      "type": "keydown",
+      "t_client_us": 20000000,
+      "data": {
+        "code": "ControlLeft",
+        "cat": "modifier",
+        "rep": false,
+        "mods": 2,
+        "trusted": true,
+        "composing": false,
+        "target": "editor",
+        "line": 1,
+        "col": 1
+      }
+    },
+    {
+      "client_seq": 7,
+      "type": "keydown",
+      "t_client_us": 20150000,
+      "data": {
+        "code": "KeyV",
+        "cat": "letter",
+        "rep": false,
+        "mods": 2,
+        "trusted": true,
+        "composing": false,
+        "target": "editor",
+        "line": 1,
+        "col": 1
+      }
+    },
+    {
+      "client_seq": 8,
+      "type": "paste",
+      "t_client_us": 20150800,
+      "data": {
+        "len": 23,
+        "newlines": 2,
+        "trusted": true,
+        "mimes": [
+          "text/plain"
+        ],
+        "start_line": 1,
+        "start_col": 1,
+        "end_line": 3,
+        "end_col": 1
+      }
+    },
+    {
+      "client_seq": 9,
+      "type": "content_change",
+      "t_client_us": 20151000,
+      "data": {
+        "version_id": 2,
+        "idx": 0,
+        "n": 1,
+        "offset": 0,
+        "del_len": 0,
+        "ins_len": 23,
+        "text": "def f(a):\n    return a\n",
+        "start_line": 1,
+        "start_col": 1,
+        "end_line": 1,
+        "end_col": 1,
+        "cause": "paste",
+        "undo": false,
+        "redo": false,
+        "flush": false
+      }
+    },
+    {
+      "client_seq": 10,
+      "type": "keyup",
+      "t_client_us": 20230000,
+      "data": {
+        "code": "KeyV",
+        "cat": "letter",
+        "rep": false,
+        "mods": 2,
+        "trusted": true,
+        "composing": false,
+        "target": "editor",
+        "line": 1,
+        "col": 1
+      }
+    },
+    {
+      "client_seq": 11,
+      "type": "keyup",
+      "t_client_us": 20300000,
+      "data": {
+        "code": "ControlLeft",
+        "cat": "modifier",
+        "rep": false,
+        "mods": 0,
+        "trusted": true,
+        "composing": false,
+        "target": "editor",
+        "line": 1,
+        "col": 1
+      }
+    },
+    {
+      "client_seq": 12,
+      "type": "snapshot",
+      "t_client_us": 20300500,
+      "data": {
+        "version_id": 2,
+        "reason": "large_insert",
+        "len": 23,
+        "sha256": "44753c9f9847f2fb40b33ac2ee0eb2464792fd33e1a4f7b88be4eb43c6e28639",
+        "text": "def f(a):\n    return a\n"
+      }
+    },
+    {
+      "client_seq": 13,
+      "type": "submit",
+      "t_client_us": 45000000,
+      "data": {
+        "version_id": 2,
+        "sha256": "44753c9f9847f2fb40b33ac2ee0eb2464792fd33e1a4f7b88be4eb43c6e28639"
+      }
+    },
+    {
+      "client_seq": 14,
+      "type": "segment_end",
+      "t_client_us": 45000100,
+      "data": {
+        "reason": "submit"
+      }
+    }
+  ]
+}

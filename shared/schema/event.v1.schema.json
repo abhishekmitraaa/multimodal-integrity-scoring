@@ -1,0 +1,400 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:integrity-exam:schema:client-batch:v1",
+  "title": "Client event batch, schema v1",
+  "description": "Canonical wire contract for client-to-server event batches. See docs/SPEC.md section 4. All numbers are integers; floats are rejected so hashing and replay are exact. KeyboardEvent.key is deliberately not accepted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "session_id", "epoch", "batch_seq", "events"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "session_id": { "$ref": "#/$defs/uuid" },
+    "epoch": { "$ref": "#/$defs/uint" },
+    "batch_seq": { "$ref": "#/$defs/uint" },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 500,
+      "items": { "$ref": "#/$defs/event" }
+    }
+  },
+  "$defs": {
+    "uint": { "type": "integer", "minimum": 0 },
+    "pos": { "type": "integer", "minimum": 1 },
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "code_text": { "type": "string", "maxLength": 1000000 },
+
+    "event": {
+      "oneOf": [
+        { "$ref": "#/$defs/ev_segment_start" },
+        { "$ref": "#/$defs/ev_segment_end" },
+        { "$ref": "#/$defs/ev_keydown" },
+        { "$ref": "#/$defs/ev_keyup" },
+        { "$ref": "#/$defs/ev_content_change" },
+        { "$ref": "#/$defs/ev_paste" },
+        { "$ref": "#/$defs/ev_copy" },
+        { "$ref": "#/$defs/ev_cut" },
+        { "$ref": "#/$defs/ev_drop" },
+        { "$ref": "#/$defs/ev_focus" },
+        { "$ref": "#/$defs/ev_blur" },
+        { "$ref": "#/$defs/ev_visibility" },
+        { "$ref": "#/$defs/ev_cursor" },
+        { "$ref": "#/$defs/ev_composition" },
+        { "$ref": "#/$defs/ev_run" },
+        { "$ref": "#/$defs/ev_submit" },
+        { "$ref": "#/$defs/ev_snapshot" },
+        { "$ref": "#/$defs/ev_client_notice" }
+      ]
+    },
+
+    "ev_segment_start": {
+      "type": "object", "additionalProperties": false,
+      "required": ["client_seq", "type", "t_client_us", "data"],
+      "properties": {
+        "client_seq": { "$ref": "#/$defs/uint" },
+        "type": { "const": "segment_start" },
+        "t_client_us": { "$ref": "#/$defs/uint" },
+        "data": { "$ref": "#/$defs/d_segment_start" }
+      }
+    },
+    "ev_segment_end": {
+      "type": "object", "additionalProperties": false,
+      "required": ["client_seq", "type", "t_client_us", "data"],
+      "properties": {
+        "client_seq": { "$ref": "#/$defs/uint" },
+        "type": { "const": "segment_end" },
+        "t_client_us": { "$ref": "#/$defs/uint" },
+        "data": { "$ref": "#/$defs/d_segment_end" }
+      }
+    },
+    "ev_keydown": {
+      "type": "object", "additionalProperties": false,
+      "required": ["client_seq", "type", "t_client_us", "data"],
+      "properties": {
+        "client_seq": { "$ref": "#/$defs/uint" },
+        "type": { "const": "keydown" },
+        "t_client_us": { "$ref": "#/$defs/uint" },
+        "data": { "$ref": "#/$defs/d_key" }
+      }
+    },
+    "ev_keyup": {
+      "type": "object", "additionalProperties": false,
+      "required": ["client_seq", "type", "t_client_us", "data"],
+      "properties": {
+        "client_seq": { "$ref": "#/$defs/uint" },
+        "type": { "const": "keyup" },
+        "t_client_us": { "$ref": "#/$defs/uint" },
+        "data": { "$ref": "#/$defs/d_key" }
+      }
+    },
+    "ev_content_change": {
+      "type": "object", "additionalProperties": false,
+      "required": ["client_seq", "type", "t_client_us", "data"],
+      "properties": {
+        "client_seq": { "$ref": "#/$defs/uint" },
+        "type": { "const": "content_change" },
+        "t_client_us": { "$ref": "#/$defs/uint" },
+        "data": { "$ref": "#/$defs/d_content_change" }
+      }
+    },
+    "ev_paste": {
+      "type": "object", "additionalProperties": false,
+      "required": ["client_seq", "type", "t_client_us", "data"],
+      "properties": {
+        "client_seq": { "$ref": "#/$defs/uint" },
+        "type": { "const": "paste" },
+        "t_client_us": { "$ref": "#/$defs/uint" },
+        "data": { "$ref": "#/$defs/d_paste" }
+      }
+    },
+    "ev_copy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["client_seq", "type", "t_client_us", "data"],
+      "properties": {
+        "client_seq": { "$ref": "#/$defs/uint" },
+        "type": { "const": "copy" },
+        "t_client_us": { "$ref": "#/$defs/uint" },
+        "data": { "$ref": "#/$defs/d_clip" }
+      }
+    },
+    "ev_cut": {
+      "type": "object", "additionalProperties": false,
+      "required": ["client_seq", "type", "t_client_us", "data"],
+      "properties": {
+        "client_seq": { "$ref": "#/$defs/uint" },
+        "type": { "const": "cut" },
+        "t_client_us": { "$ref": "#/$defs/uint" },
+        "data": { "$ref": "#/$defs/d_clip" }
+      }
+    },
+    "ev_drop": {
+      "type": "object", "additionalProperties": false,
+      "required": ["client_seq", "type", "t_client_us", "data"],
+      "properties": {
+        "client_seq": { "$ref": "#/$defs/uint" },
+        "type": { "const": "drop" },
+        "t_client_us": { "$ref": "#/$defs/uint" },
+        "data": {
+          "type": "object", "additionalProperties": false,
+          "required": ["len"],
+          "properties": { "len": { "$ref": "#/$defs/uint" } }
+        }
+      }
+    },
+    "ev_focus": {
+      "type": "object", "additionalProperties": false,
+      "required": ["client_seq", "type", "t_client_us", "data"],
+      "properties": {
+        "client_seq": { "$ref": "#/$defs/uint" },
+        "type": { "const": "focus" },
+        "t_client_us": { "$ref": "#/$defs/uint" },
+        "data": { "$ref": "#/$defs/d_focus" }
+      }
+    },
+    "ev_blur": {
+      "type": "object", "additionalProperties": false,
+      "required": ["client_seq", "type", "t_client_us", "data"],
+      "properties": {
+        "client_seq": { "$ref": "#/$defs/uint" },
+        "type": { "const": "blur" },
+        "t_client_us": { "$ref": "#/$defs/uint" },
+        "data": { "$ref": "#/$defs/d_focus" }
+      }
+    },
+    "ev_visibility": {
+      "type": "object", "additionalProperties": false,
+      "required": ["client_seq", "type", "t_client_us", "data"],
+      "properties": {
+        "client_seq": { "$ref": "#/$defs/uint" },
+        "type": { "const": "visibility" },
+        "t_client_us": { "$ref": "#/$defs/uint" },
+        "data": {
+          "type": "object", "additionalProperties": false,
+          "required": ["state"],
+          "properties": { "state": { "enum": ["visible", "hidden"] } }
+        }
+      }
+    },
+    "ev_cursor": {
+      "type": "object", "additionalProperties": false,
+      "required": ["client_seq", "type", "t_client_us", "data"],
+      "properties": {
+        "client_seq": { "$ref": "#/$defs/uint" },
+        "type": { "const": "cursor" },
+        "t_client_us": { "$ref": "#/$defs/uint" },
+        "data": {
+          "type": "object", "additionalProperties": false,
+          "required": ["line", "col", "sel_len", "reason", "source"],
+          "properties": {
+            "line": { "$ref": "#/$defs/pos" },
+            "col": { "$ref": "#/$defs/pos" },
+            "sel_len": { "$ref": "#/$defs/uint" },
+            "reason": { "$ref": "#/$defs/uint" },
+            "source": { "type": "string", "maxLength": 32 }
+          }
+        }
+      }
+    },
+    "ev_composition": {
+      "type": "object", "additionalProperties": false,
+      "required": ["client_seq", "type", "t_client_us", "data"],
+      "properties": {
+        "client_seq": { "$ref": "#/$defs/uint" },
+        "type": { "const": "composition" },
+        "t_client_us": { "$ref": "#/$defs/uint" },
+        "data": {
+          "type": "object", "additionalProperties": false,
+          "required": ["phase", "len"],
+          "properties": {
+            "phase": { "enum": ["start", "update", "end"] },
+            "len": { "$ref": "#/$defs/uint" }
+          }
+        }
+      }
+    },
+    "ev_run": {
+      "type": "object", "additionalProperties": false,
+      "required": ["client_seq", "type", "t_client_us", "data"],
+      "properties": {
+        "client_seq": { "$ref": "#/$defs/uint" },
+        "type": { "const": "run" },
+        "t_client_us": { "$ref": "#/$defs/uint" },
+        "data": {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "n_tests", "n_passed", "status", "dur_ms", "version_id"],
+          "properties": {
+            "kind": { "enum": ["run", "test"] },
+            "n_tests": { "$ref": "#/$defs/uint" },
+            "n_passed": { "$ref": "#/$defs/uint" },
+            "status": { "enum": ["ok", "error", "timeout"] },
+            "dur_ms": { "$ref": "#/$defs/uint" },
+            "version_id": { "$ref": "#/$defs/uint" }
+          }
+        }
+      }
+    },
+    "ev_submit": {
+      "type": "object", "additionalProperties": false,
+      "required": ["client_seq", "type", "t_client_us", "data"],
+      "properties": {
+        "client_seq": { "$ref": "#/$defs/uint" },
+        "type": { "const": "submit" },
+        "t_client_us": { "$ref": "#/$defs/uint" },
+        "data": {
+          "type": "object", "additionalProperties": false,
+          "required": ["version_id", "sha256"],
+          "properties": {
+            "version_id": { "$ref": "#/$defs/uint" },
+            "sha256": { "$ref": "#/$defs/sha256" }
+          }
+        }
+      }
+    },
+    "ev_snapshot": {
+      "type": "object", "additionalProperties": false,
+      "required": ["client_seq", "type", "t_client_us", "data"],
+      "properties": {
+        "client_seq": { "$ref": "#/$defs/uint" },
+        "type": { "const": "snapshot" },
+        "t_client_us": { "$ref": "#/$defs/uint" },
+        "data": {
+          "type": "object", "additionalProperties": false,
+          "required": ["version_id", "reason", "len", "sha256", "text"],
+          "properties": {
+            "version_id": { "$ref": "#/$defs/uint" },
+            "reason": { "enum": ["timer", "large_insert", "run", "submit", "segment_start", "resync"] },
+            "len": { "$ref": "#/$defs/uint" },
+            "sha256": { "$ref": "#/$defs/sha256" },
+            "text": { "$ref": "#/$defs/code_text" }
+          }
+        }
+      }
+    },
+    "ev_client_notice": {
+      "type": "object", "additionalProperties": false,
+      "required": ["client_seq", "type", "t_client_us", "data"],
+      "properties": {
+        "client_seq": { "$ref": "#/$defs/uint" },
+        "type": { "const": "client_notice" },
+        "t_client_us": { "$ref": "#/$defs/uint" },
+        "data": {
+          "type": "object", "additionalProperties": false,
+          "required": ["code", "detail"],
+          "properties": {
+            "code": { "enum": ["ws_reconnect", "buffer_overflow", "policy_mismatch", "clock_regression", "error"] },
+            "detail": { "type": "string", "maxLength": 256 }
+          }
+        }
+      }
+    },
+
+    "d_segment_start": {
+      "type": "object", "additionalProperties": false,
+      "required": ["time_origin_unix_us", "page", "problem_id", "editor_policy_id", "editor_policy_sha256", "device", "timer", "synthetic"],
+      "properties": {
+        "time_origin_unix_us": { "$ref": "#/$defs/uint" },
+        "page": { "enum": ["practice", "exam"] },
+        "problem_id": { "type": "string", "pattern": "^[a-z0-9_-]{1,64}$" },
+        "editor_policy_id": { "type": "string", "pattern": "^[a-z0-9_.-]{1,64}$" },
+        "editor_policy_sha256": { "$ref": "#/$defs/sha256" },
+        "device": {
+          "type": "object", "additionalProperties": false,
+          "required": ["os_family", "browser_family", "browser_major", "layout", "layout_source", "keyboard_type", "screen_w", "screen_h", "dpr_x100"],
+          "properties": {
+            "os_family": { "enum": ["windows", "macos", "linux", "chromeos", "other"] },
+            "browser_family": { "enum": ["chromium", "firefox", "webkit", "other"] },
+            "browser_major": { "$ref": "#/$defs/uint" },
+            "layout": { "type": "string", "maxLength": 32 },
+            "layout_source": { "enum": ["api", "self_report", "unknown"] },
+            "keyboard_type": { "enum": ["laptop_builtin", "external", "other", "unknown"] },
+            "screen_w": { "$ref": "#/$defs/uint" },
+            "screen_h": { "$ref": "#/$defs/uint" },
+            "dpr_x100": { "$ref": "#/$defs/uint" }
+          }
+        },
+        "timer": {
+          "type": "object", "additionalProperties": false,
+          "required": ["resolution_us", "cross_origin_isolated"],
+          "properties": {
+            "resolution_us": { "$ref": "#/$defs/uint" },
+            "cross_origin_isolated": { "type": "boolean" }
+          }
+        },
+        "synthetic": { "type": "boolean" }
+      }
+    },
+    "d_segment_end": {
+      "type": "object", "additionalProperties": false,
+      "required": ["reason"],
+      "properties": { "reason": { "enum": ["submit", "unload", "timeout", "abort"] } }
+    },
+    "d_key": {
+      "type": "object", "additionalProperties": false,
+      "required": ["code", "cat", "rep", "mods", "trusted", "composing", "target", "line", "col"],
+      "properties": {
+        "code": { "type": "string", "pattern": "^[A-Za-z0-9]{0,32}$" },
+        "cat": { "enum": ["letter", "digit", "symbol", "bracket", "whitespace", "backspace", "navigation", "modifier", "other"] },
+        "rep": { "type": "boolean" },
+        "mods": { "type": "integer", "minimum": 0, "maximum": 15 },
+        "trusted": { "type": "boolean" },
+        "composing": { "type": "boolean" },
+        "target": { "enum": ["editor", "find_widget", "other"] },
+        "line": { "$ref": "#/$defs/pos" },
+        "col": { "$ref": "#/$defs/pos" }
+      }
+    },
+    "d_content_change": {
+      "type": "object", "additionalProperties": false,
+      "required": ["version_id", "idx", "n", "offset", "del_len", "ins_len", "text", "start_line", "start_col", "end_line", "end_col", "cause", "undo", "redo", "flush"],
+      "properties": {
+        "version_id": { "$ref": "#/$defs/uint" },
+        "idx": { "$ref": "#/$defs/uint" },
+        "n": { "$ref": "#/$defs/pos" },
+        "offset": { "$ref": "#/$defs/uint" },
+        "del_len": { "$ref": "#/$defs/uint" },
+        "ins_len": { "$ref": "#/$defs/uint" },
+        "text": { "$ref": "#/$defs/code_text" },
+        "start_line": { "$ref": "#/$defs/pos" },
+        "start_col": { "$ref": "#/$defs/pos" },
+        "end_line": { "$ref": "#/$defs/pos" },
+        "end_col": { "$ref": "#/$defs/pos" },
+        "cause": { "enum": ["typed", "command", "paste", "cut", "undo", "redo", "drop", "ime", "flush", "other", "unknown"] },
+        "undo": { "type": "boolean" },
+        "redo": { "type": "boolean" },
+        "flush": { "type": "boolean" }
+      }
+    },
+    "d_paste": {
+      "type": "object", "additionalProperties": false,
+      "required": ["len", "newlines", "trusted", "mimes", "start_line", "start_col", "end_line", "end_col"],
+      "properties": {
+        "len": { "$ref": "#/$defs/uint" },
+        "newlines": { "$ref": "#/$defs/uint" },
+        "trusted": { "type": "boolean" },
+        "mimes": { "type": "array", "maxItems": 16, "items": { "type": "string", "maxLength": 64 } },
+        "start_line": { "$ref": "#/$defs/pos" },
+        "start_col": { "$ref": "#/$defs/pos" },
+        "end_line": { "$ref": "#/$defs/pos" },
+        "end_col": { "$ref": "#/$defs/pos" }
+      }
+    },
+    "d_clip": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source", "len", "sha256"],
+      "properties": {
+        "source": { "enum": ["editor", "problem_panel", "other"] },
+        "len": { "$ref": "#/$defs/uint" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "d_focus": {
+      "type": "object", "additionalProperties": false,
+      "required": ["target"],
+      "properties": { "target": { "enum": ["editor", "window"] } }
+    }
+  }
+}

@@ -1,0 +1,19 @@
+# Privacy and data handling. See docs/SPEC.md section 10.
+min_participant_age: 18
+pseudonym:
+  prefix_real: "P-"
+  prefix_synthetic: "SYN-"
+  length: 8
+  alphabet: crockford_base32
+retention_days: null             # [OPEN Q4] must be set before any real collection
+data_root: null                  # [OPEN Q1] must be outside any cloud-synced folder (e.g. OneDrive)
+forbidden_data_root_markers: [OneDrive, Dropbox, "Google Drive", iCloud]
+encryption:
+  algorithm: aes-256-gcm
+  key_file: secrets/data_key.bin
+  encrypted_fields: [events.data, snapshots, review_notes, appeal_notes]
+signing:
+  algorithm: ed25519
+  key_file: secrets/chain_signing_key.pem
+access_log: true
+roles: [participant, reviewer, researcher, admin]

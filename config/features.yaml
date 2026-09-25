@@ -1,0 +1,26 @@
+# Feature extraction. See docs/SPEC.md section 6.
+keystroke:
+  window_keystrokes: 70          # [BRIEF] ~70; 50 as ablation
+  window_keystrokes_ablation: [50, 70]
+  exam_stride: 35
+  latency_clip_ms: 1500          # [PROPOSED] check against TypeNet preprocessing in P2
+  include_modifiers: true
+  max_timer_resolution_us: 1000  # keystroke modality unavailable above this
+  window_max_age_s: 120
+process:
+  horizon_s: 120
+  pause_thresholds_ms: [200, 2000]   # [BRIEF]
+  burst_gap_ms: 2000
+  large_burst_min_chars: 40
+  speed_bin_s: 10
+  min_keydowns: 50
+ast:
+  language: python
+  laplace_alpha: 0.5             # [PROPOSED] ablate 0.1, 0.5, 1.0
+  jsd_log_base: 2
+  min_named_nodes: 50
+  jump_min_nodes: 30
+  jump_max_keydowns: 30
+clipboard:
+  horizon_s: 120
+  focus_paste_coupling_s: 10
