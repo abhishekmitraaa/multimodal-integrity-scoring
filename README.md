@@ -69,13 +69,13 @@ cd frontend && npm install && npx playwright install chromium firefox webkit
 
 ## Running the app locally (development data only)
 
-```bash
-# terminal 1: database schema, then the API on :8000
-.venv/Scripts/python -m alembic -c backend/alembic.ini upgrade head
-set INTEGRITY_DATA_ROOT=C:\integrity-data           # must be outside the repo and cloud sync
-.venv/Scripts/python -m integrity_backend.app
-# terminal 2: the web app on :5173 (set COI=1 to serve cross-origin isolated)
-cd frontend && npm run dev
+```powershell
+# terminal 1 (PowerShell): database schema, then the API on :8000
+.venv\Scripts\python -m alembic -c backend\alembic.ini upgrade head
+$env:INTEGRITY_DATA_ROOT = "C:\integrity-data"      # must be outside the repo and cloud sync
+.venv\Scripts\python -m integrity_backend.app
+# terminal 2: the web app on :5173 ($env:COI = "1" first to serve it cross-origin isolated)
+cd frontend; npm run dev
 ```
 
 Open http://127.0.0.1:5173. It creates `DEV-` participants. Real participants are refused until
