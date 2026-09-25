@@ -1,6 +1,8 @@
 # SPEC: Personalized Multi-Modal Integrity Scoring for Live Coding Exams
 
-Version 0.1, Phase 0 draft, 2026-09-25. Course: BITE308L, VIT. Status: **awaiting approval**.
+Version 0.2, 2026-09-25. Course: BITE308L, VIT. Status: **Phase 0 approved with changes**
+(Q1, Q2, Q3 and Q5 decided; Q4 is with the faculty guide). Repository: `C:\dev\integrity-exam`,
+outside any cloud-synced folder. Python is pinned to 3.11.
 
 Markers used in this document:
 
@@ -61,6 +63,23 @@ Two more limits follow from the design:
 - No authorship proof and no automated academic decision.
 - Python is the only exam language (tree-sitter-python). Other languages come later, if at all.
 
+### 1.4 Known limitations, stated up front
+
+- **Run/Test results are client-reported and forgeable.** Code runs in Pyodide inside a Web Worker
+  in the student's browser (decision Q2). The server logs what the client says the result was.
+  Results are never used for grading, only for the run-cadence process feature.
+- **Role-play is not real cheating.** Attack conditions A1, A4 and A5 are performed by consenting
+  volunteers told to "cheat" with no stakes. Real cheaters are motivated, may practise evasion,
+  and may behave differently under exam stress. Detection rates measured on role-play may overstate
+  or understate real-world performance. Every report carries this caveat.
+- **Participants know transcription is studied.** The practice modules include a transcription
+  block, and A4 asks participants to copy-type. Participants therefore know copy-typing is being
+  studied and may type differently from an unaware student. The transcription-mode profile may
+  partly capture "typing while observed".
+- **Small, local sample.** 50+ volunteers from one university, with mostly similar keyboards and
+  layouts. Results do not generalise to other populations without new data.
+- **Client-side trust.** See section 1.2: someone who controls the page can forge any telemetry.
+
 ---
 
 ## 2. Architecture
@@ -82,7 +101,7 @@ Two more limits follow from the design:
 
 | Package | Owns |
 |---|---|
-| `frontend/` | Monaco exam app, practice modules, consent screen, reviewer dashboard UI, Playwright tests |
+| `frontend/` | Monaco exam app, practice modules, consent screen, Pyodide Run/Test in a Web Worker, reviewer dashboard UI, Playwright tests |
 | `backend/` | FastAPI app, WebSocket ingest, hash chain, storage, replay, online scoring, review and privacy endpoints |
 | `ml/` | Feature extraction (keystroke, process, AST, clipboard), keystroke encoder, digraph baseline, fusion, calibration |
 | `eval/` | Attack harness (A1–A8), dataset splits, metrics, bootstrap, reports, test-access ledger |
@@ -183,15 +202,22 @@ $C(e)$ is the UTF-8 encoding of the JSON object
 sorted keys, separators `(",", ":")`, `ensure_ascii=False`, computed over the **plaintext** before
 encryption. Because the schema bans floats, this form is unambiguous.
 
-- **Checkpoints.** Every `capture.checkpoint_every_events` events and at session close, the server
-  signs `(session_id, server_seq, h)` with an Ed25519 key held outside the database.
-- **Receipt.** At close, the participant is shown a receipt with the event count, the head hash and
-  the signature.
+**P1 scope: plain hash chain only** (decision before P1). Signed checkpoints are deferred.
+
 - **Verification.** `verify_chain(session_id)` recomputes the chain and reports the first bad
   index.
-- **What it detects.** Modification, insertion, deletion or reordering of stored events by anyone
-  who lacks the signing key, and by anyone at all once the participant holds a receipt.
-- **What it does not detect.** Anything a dishonest client sent in the first place.
+- **Head hash at close.** Closing a session returns `{n_events, head_hash}` and the submit screen
+  shows it. This is unsigned. It is included because it costs nothing.
+- **What it detects in P1.** Accidental corruption, and any edit, insertion, deletion or reordering
+  of stored events by someone who does not also recompute every later hash. It also catches a full
+  recomputation, but only if the participant kept the head hash from their submit screen.
+- **What it does not detect in P1.** A deliberate rewrite by someone with database write access who
+  recomputes the whole chain, when nobody kept the head hash. Signed checkpoints would close this
+  gap and are deferred.
+- **What it never detects.** Anything a dishonest client sent in the first place.
+- **Deferred.** Every `capture.checkpoint_every_events` events and at close, the server signs
+  `(session_id, server_seq, h)` with an Ed25519 key held outside the database, and the receipt
+  carries the signature.
 
 ### 4.5 Event types
 
@@ -211,7 +237,7 @@ fields are defined exactly in the JSON Schema. Summary:
 | `visibility` | `visibilitychange` | `state` |
 | `cursor` | cursor or selection change **not** caused by typing (throttled) | `line`, `col`, `sel_len`, `reason`, `source` |
 | `composition` | IME composition | `phase`, `len` |
-| `run` | Run or Test finishes | `kind`, `n_tests`, `n_passed`, `status`, `dur_ms`, `version_id` |
+| `run` | Run or Test finishes in the Pyodide worker. **Client-reported, forgeable.** | `kind`, `n_tests`, `n_passed`, `status`, `dur_ms`, `version_id` |
 | `submit` | Submit | `version_id`, `sha256` |
 | `snapshot` | timer, large insert, run, submit, segment start, resync | `version_id`, `reason`, `len`, `sha256`, `text` |
 | `client_notice` | reconnect, buffer overflow, policy mismatch, clock regression, error | `code`, `detail` |
@@ -507,11 +533,21 @@ are shared, the baseline is unavailable.
 - **Model.** L2 logistic regression; $C$ is chosen by inner cross-validation. An MLP is added only
   if a pre-registered, cross-validated ablation shows a gain whose 95% CI excludes 0. With 30–50
   users an MLP will overfit.
-- **Weight-sign guard.** The seven distance weights must be **negative**, because high $S$ means
-  genuine. The unit test `test_fusion_weights_negative` checks this on synthetic data with a known
-  orientation. The same check (`assert_weight_signs`) runs on **every** trained fusion artifact and
-  fails the training run if a sign flips, so the flip gets investigated, for example for
-  collinearity.
+- **Sign constraint (implemented: `ml/src/integrity_ml/fusion.py`).** Distance weights are
+  **constrained** $w_j \le 0$ during fitting (L-BFGS-B with bounds), not just checked afterwards,
+  because high $S$ means genuine. Standardisation divides by a positive scale, so the constraint
+  carries over to raw inputs. Availability indicators and the intercept are unconstrained. The
+  objective equals scikit-learn's L2 logistic regression, and the fit matches it when no bound is
+  active.
+- **Tests (`ml/tests/test_fusion.py`):**
+  - on data where an unconstrained fit gives a distance feature a positive weight, the constrained
+    weight sits at exactly 0;
+  - no distance weight is positive over 20 random synthetic datasets;
+  - raising any distance input never raises $S$;
+  - the fit matches scikit-learn when the bounds are inactive.
+- **Guard.** `assert_weight_signs` runs on every trained artifact.
+- **Weights pinned at 0.** A distance weight stuck at the bound means the data disagreed with the
+  orientation. Training logs it, and the report names it.
 
 ---
 
@@ -546,6 +582,49 @@ where $a_m$ are the availability indicators.
   and time-to-detection is simply the first crossing.
 - **Known weakness.** Long sessions get more chances to cross. P5 reports false-flag rate against
   session length.
+
+**How smoothing affects time-to-detection** (implemented and tested in
+`ml/src/integrity_ml/smoothing.py`):
+
+Time-to-detection is the sum of two parts:
+
+$$
+\text{TTD} = T_{evidence} + T_{smoothing}
+$$
+
+- **$T_{evidence}$:** the time until raw ticks reflect the attack. It does not depend on
+  smoothing.
+  - A paste triggers a tick immediately.
+  - A keystroke window is only fully post-onset after 70 keystrokes following the onset. Until then
+    it mixes pre-onset and post-onset typing.
+- **$T_{smoothing}$:** extra ticks caused by the EWMA. Suppose the smoothed logit is $\ell_0 > \theta$
+  at onset ($\theta = \mathrm{logit}\,\tau$) and the attack holds the raw logit at $\ell_1 < \theta$.
+  Then the first crossing happens after
+
+$$
+k^* = \left\lfloor \frac{\ln r}{\ln(1-\lambda)} \right\rfloor + 1 \ \text{ticks}, \qquad r = \frac{\theta - \ell_1}{\ell_0 - \ell_1}
+$$
+
+  and $T_{smoothing}$ is the $k^* - 1$ ticks beyond the first.
+  - With $\lambda = 1$ (no smoothing), $k^* = 1$.
+  - If $\ell_1 \ge \theta$ the attack is never detected, whatever $\lambda$ is.
+
+What this means in practice:
+
+- **Strong evidence costs nothing.** A single tick crosses when
+  $\ell_1 < (\theta - (1-\lambda)\ell_0)/\lambda$. With $\lambda = 0.5$ that means twice as far
+  below $\theta$ as the score was above it. A large external paste (A1) should clear this, so it
+  costs no extra ticks.
+- **Weak, sustained evidence costs a few ticks.** Worked example: $\lambda = 0.5$, the score sits 2
+  logits above threshold, and the attack holds it 0.5 below. Then $k^* = 3$, which is 2 extra ticks.
+  At 35 keystrokes per tick that is roughly 70 extra keystrokes, which is 30–60 s at typical coding
+  speeds. Copy-type (A4) and edited LLM code (A5) are expected to look like this.
+- **Whole-session attacks pay nothing.** The EWMA starts at the first score, so an attack that
+  starts before the first tick has no smoothing delay.
+- **Smoothing also cuts false flags.** A one-tick dip must be deeper to cross, so genuine sessions
+  cross less often. $\tau$ is recalibrated for each $\lambda$ on validation data, so the trade is
+  "fewer false flags for a later detection". P5 reports detection rate, time-to-detection and
+  false-flag rate for $\lambda \in \{1, 0.5, 0.3\}$, each at its own validation-calibrated $\tau$.
 
 ### 8.4 States [BRIEF]
 
@@ -701,27 +780,36 @@ same information as the code itself, and it is disclosed in the notice.
 ### 10.5 Pseudonymisation
 
 - Pseudonyms are random: `P-` + 8 base32 characters.
-- The identity map (identity ↔ pseudonym) is held **offline** by one named custodian
-  **[OPEN: who]**. It is never in the app database, repository or reviewer tools.
+- The identity map (identity ↔ pseudonym) is held **offline** by one named custodian, never one
+  of the three students **[OPEN Q4: faculty guide to name]**. It is never in the app database,
+  repository or reviewer tools.
 - Reviewers see pseudonyms only.
 - The participant keeps their pseudonym on the consent receipt, for withdrawal and appeals.
 
 ### 10.6 Security
 
-- **At rest.** Application-level AES-256-GCM on `events.data`, snapshots, review notes and appeal
-  notes [PROPOSED D-006]. The key comes from `secrets/`, never from the repo. The database volume
-  should also sit on an encrypted disk (BitLocker or LUKS).
+- **At rest [DECIDED Q1].** Application-level AES-256-GCM on `events.data` (P1), and later on
+  snapshots, review notes and appeal notes. The associated data is `session_id‖server_seq`, so a
+  ciphertext cannot be moved to another row undetected. The key comes from `secrets/`, never from
+  the repo. The database lives in a Docker named volume, not in the repository.
+- **Data root [DECIDED Q1].** Exported datasets and files live under `INTEGRITY_DATA_ROOT`, outside
+  the repository, and are written encrypted. The disk should also be encrypted (BitLocker or Device
+  Encryption). As of P0 this machine's disk-encryption status is **unknown**: the check needs admin
+  rights.
 - **In transit.** TLS (`wss://`, `https://`) outside localhost development.
 - **Roles.** `participant`, `reviewer`, `researcher` (pseudonymised aggregates only), `admin`.
 - **Least privilege.** The app database role cannot UPDATE or DELETE `events`.
 - **Access log.** Every read of a session's events, replay, scores or notes is written to
   `access_log` (actor, role, action, target, time). Admins can view it.
-- **Cloud sync.** Data directories MUST NOT be inside a cloud-synced folder. The backend refuses to
-  start if `privacy.data_root` is under a known sync root such as OneDrive **[OPEN Q1]**.
+- **Cloud sync.** Data directories MUST NOT be inside a cloud-synced folder or inside the repository.
+  The backend refuses to start if the data root is under a known sync root (OneDrive, Dropbox,
+  Google Drive, iCloud) or inside the repository.
 
 ### 10.7 Retention and erasure
 
-- **Retention job.** A nightly job purges sessions older than `privacy.retention_days` **[OPEN]**.
+- **Retention job.** Raw logs are deleted N days after project end, with N set by the faculty guide
+  **[OPEN Q4]**. A job purges them on that date. Derived pseudonymised features follow the second
+  retention answer in the governance one-pager.
 - **Erasure endpoint.** `DELETE /api/participants/{pseudonym}`, callable by the participant (with
   their token) or by an admin (with a request id). It deletes events, snapshots, features, scores,
   cases, notes, appeals and consent choices, and writes an `erasure_log` tombstone with no personal
@@ -789,11 +877,14 @@ Shown on the consent screen, the dashboard and in every report:
 | ID | Data | Use |
 |---|---|---|
 | D1 | Aalto 136M keystrokes, desktop **[VERIFY licence; lead confirms and downloads]** | encoder pretraining; P2 TypeNet reproduction |
-| D2 | Our collection: 30–50 consenting adult students, code-typing, with study conditions | fine-tuning, fusion, calibration, evaluation |
+| D2 | Our collection: recruit 50+ consenting adult students so that 30–50 complete both sittings; code-typing, with study conditions | fine-tuning, fusion, calibration, evaluation |
 | D3 | **Synthetic**, labelled | pipeline tests only; never reported as results |
 
-### 12.2 Study protocol [PROPOSED D-011, OPEN Q3]
+### 12.2 Study protocol [DECIDED Q3, with changes]
 
+- **Ethics gate.** No real collection before institutional ethics approval and the P5 ethics and
+  consent checklist.
+- **Recruitment.** 50+ participants, allowing for dropout between sittings.
 - **Sitting 1 (~40 min).**
   1. Consent, then the device questionnaire.
   2. Three practice modules. Each has (a) about 2 min of transcribing given code, which gives
@@ -809,8 +900,10 @@ Shown on the consent screen, the dashboard and in every report:
   on the participants' exam task texts. A3b uses the participant's own enrollment timing, as
   consented in §10.3.
 - **LLM code.** A4 and A5 use LLM solutions **generated before collection and frozen**, stored with
-  model name, version, date and prompt, and labelled `llm_generated`. No live LLM is used during
-  collection.
+  model name, version, date and prompt, and labelled `llm_generated`.
+- **Live-LLM subset.** 8–10 participants additionally do A5 with a live LLM of their choice. They
+  record the model, prompts and outputs. Their sessions are labelled `A5_live` and reported
+  separately from frozen-output A5. This subset is small, so its results are descriptive only.
 - **Onset.** Condition labels and attack onset times are recorded by the study tooling and never
   reach the scoring path.
 - **Role-play.** Participants are told that attack conditions are role-play with no consequences.
@@ -818,7 +911,7 @@ Shown on the consent screen, the dashboard and in every report:
 The transcription-mode profile is a hypothesis: it may help separate *this student's*
 composition from *this student's* transcription (A4). It is tested, not assumed.
 
-### 12.3 Splits and leakage rules [PROPOSED D-008]
+### 12.3 Splits and leakage rules [DECIDED Q5]
 
 - **Scheme.** User-disjoint nested cross-validation: 5 outer folds, and inside each training fold an
   inner split into train and validation users.
@@ -853,8 +946,9 @@ user for testing without leakage.
 
 ### 12.5 Statistics
 
-- **Bootstrap.** 95% CIs by cluster bootstrap over **participants**, 10,000 resamples, seeded,
-  percentile method.
+- **Bootstrap [DECIDED Q5].** 95% CIs by cluster bootstrap over **users**. Each resample draws
+  users with replacement and brings all of that user's sessions and windows with them; sessions
+  are never resampled independently. 10,000 resamples, seeded, percentile method.
 - **What the CIs mean.** They cover sampling of test users for a fixed trained model. Training
   variance is shown separately by repeating nested CV with 3 seeds.
 - **Pre-registered primary endpoints.**
@@ -874,12 +968,26 @@ user for testing without leakage.
 
 ### 12.7 P2 reproduction protocol
 
-- **Before training.** Extract TypeNet's exact Aalto desktop protocol from the paper (sequence
-  length, enrollment and test counts, number and selection of test users, preprocessing, score
-  rule) and record it in `docs/p2_protocol.md`.
-- **Acceptance [OPEN Q5].** Our EER at each $G$ is within max(1 percentage point absolute, 50%
-  relative) of the published value, or a written gap analysis explains the difference (training
-  users, epochs, compute, preprocessing).
+- **Before any training [DECIDED Q5].** Write `docs/p2_protocol.md` with the exact protocol, each
+  item quoted from the paper with its section or table number. Anything the paper does not state
+  is marked "not stated" and our choice is recorded. Required items:
+  1. Dataset subset (desktop), filtering of users and sessions, and the train/test user counts and
+     how test users were selected.
+  2. Sequence length $M$, sequences per user, handling of shorter sequences, and padding or
+     masking.
+  3. Per-keystroke features, their units, normalisation and clipping.
+  4. Architecture: layers, units, dropout, batch norm, embedding size.
+  5. Loss (triplet), margin, triplet selection, optimiser, learning rate, batch size, epochs and
+     stopping rule.
+  6. Enrollment: $G$ values, the scoring rule (distance to each enrollment sample averaged, or to a
+     prototype), and the impostor set used for EER.
+  7. EER computation: per-user thresholds or a global threshold, and how results are averaged.
+  8. The published EER table we compare against.
+- **Our deviations.** Listed item by item (for example a smaller training set on a 6 GB GPU),
+  each with its expected effect.
+- **Acceptance [DECIDED Q5].** Our EER at each $G$ is within max(1 percentage point absolute, 50%
+  relative) of the published value under the same protocol, or a written gap analysis explains the
+  difference.
 
 ---
 
@@ -888,7 +996,7 @@ user for testing without leakage.
 | Phase | Deliverable | Acceptance |
 |---|---|---|
 | P0 | Repo skeleton, this spec, decisions log | Lead approves the spec; skeleton tests pass |
-| P1 | Capture app, server log, replay | All §4.5 events captured. Ordering tests: duplicate, out-of-order and reconnect/resend give gapless `server_seq` in `client_seq` order. Hash-chain tests: every single-field edit, insert, delete and reorder is detected, and checkpoint signatures verify. Replay equals every snapshot (non-BMP text, undo/redo, multi-cursor). Playwright end-to-end: consent → practice → type → paste → submit → replay matches. §4.11 measurements reported. |
+| P1 | Capture app, server log, replay | All §4.5 events captured. Ordering tests: duplicate, out-of-order and reconnect/resend give gapless `server_seq` in `client_seq` order. Hash-chain tests (plain chain, no signatures): every single-field edit, insert, delete and reorder is detected, and close returns the head hash. Data-root guard and field encryption tested. Replay equals every snapshot (non-BMP text, undo/redo, multi-cursor). Playwright end-to-end: consent → practice → type → paste → submit → replay matches. §4.11 measurements reported. |
 | P2 | Keystroke features, digraph baseline, TypeNet-style encoder on D1 | EER reproduced per §12.7, or the gap explained |
 | P3 | Enrollment, process, AST and clipboard features, fusion, thresholds | Every feature unit-tested; weight-sign guard passes; ticks under 50 ms; calibration curves on synthetic (labelled) and, once available, validation data |
 | P4 | Dashboard and reviewer workflow | Timeline, replay, decisions, appeals, access log. Playwright tests. Every read is logged. |
@@ -913,13 +1021,15 @@ Every phase ends with: what works, what is weak, and what the lead should decide
 
 ## 15. Open decisions
 
-See [DECISIONS.md](DECISIONS.md) for the full log. Items marked [OPEN] above:
+See [DECISIONS.md](DECISIONS.md) for the full log.
 
-- Q1: repository and data location outside OneDrive, and the Python 3.11 toolchain.
-- Q2: where Run/Test executes.
-- Q3: study protocol (two sittings, conditions, frozen LLM outputs, transcription block).
-- Q4: retention period, identity-map custodian, Data Fiduciary contact, reviewers.
-- Q5: evaluation split scheme and the P2 "within reason" definition.
+| Question | Status |
+|---|---|
+| Q1: repo and data location, Python | **Decided.** Repo in `C:\dev\integrity-exam`; data root outside the repo and encrypted; Python 3.11 pinned. |
+| Q2: where Run/Test executes | **Decided.** Pyodide in a Web Worker, Python only; results are client-reported and forgeable (§1.4). |
+| Q3: study protocol | **Decided with changes.** 50+ recruited; live-LLM A5 subset of 8–10; role-play and transcription-awareness limitations (§1.4); ethics approval before collection. |
+| Q4: data governance | **Open.** With the faculty guide via the governance one-pager: retention N, identity-map custodian, named responsible party, reviewers outside the team. |
+| Q5: evaluation | **Decided with changes.** Nested user-level CV; cluster bootstrap over users; exact TypeNet protocol documented before P2 training (§12.7). |
 
 ---
 
