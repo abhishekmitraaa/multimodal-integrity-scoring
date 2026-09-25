@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "integrity-eval"
 version = "0.0.1"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.12"
 # Dependencies are added in the phase that first uses them, together with tests.
 dependencies = []
 

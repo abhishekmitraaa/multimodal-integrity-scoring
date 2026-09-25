@@ -5,9 +5,9 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "integrity-ml"
 version = "0.0.1"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.12"
 # Dependencies are added in the phase that first uses them, together with tests.
-dependencies = []
+dependencies = ["numpy>=1.26", "scipy>=1.11", "scikit-learn>=1.4"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]

@@ -1,5 +1,5 @@
-# P0: database only. The backend and frontend services are added in P1.
-# NOT YET RUN: Docker Desktop was not running during Phase 0.
+# Local development database. The backend runs on the host (uvicorn) during P1.
+# Create local secrets first:  python scripts/make_secrets.py
 services:
   db:
     image: postgres:16
@@ -8,8 +8,13 @@ services:
       POSTGRES_USER: integrity
       POSTGRES_PASSWORD_FILE: /run/secrets/pg_password
     secrets: [pg_password]
-    ports: ["127.0.0.1:5432:5432"]
-    volumes: [pgdata:/var/lib/postgresql/data]   # named volume: lives in Docker's VM, not in OneDrive
+    ports: ["127.0.0.1:5432:5432"]            # localhost only
+    volumes: [pgdata:/var/lib/postgresql/data] # named volume inside Docker's VM disk, not in the repo
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U integrity -d integrity"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
 
 secrets:
   pg_password:
