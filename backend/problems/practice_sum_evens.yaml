@@ -1,0 +1,13 @@
+id: practice_sum_evens
+kind: practice
+title: Sum of even numbers
+statement: |
+  Write a function `sum_evens(xs)` that returns the sum of the even integers in the list `xs`.
+  An empty list sums to 0.
+starter: |
+  def sum_evens(xs):
+      pass
+tests:
+  - {call: "sum_evens([1, 2, 3, 4])", expected: "6"}
+  - {call: "sum_evens([])", expected: "0"}
+  - {call: "sum_evens([-2, 3, 5])", expected: "-2"}

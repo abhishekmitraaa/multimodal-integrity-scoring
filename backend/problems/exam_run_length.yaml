@@ -1,0 +1,13 @@
+id: exam_run_length
+kind: exam
+title: Run-length encoding
+statement: |
+  Write a function `rle(s)` that run-length encodes a string: each run of a repeated character
+  becomes the character followed by the run length. For example `rle("aaab")` is `"a3b1"`.
+starter: |
+  def rle(s):
+      pass
+tests:
+  - {call: "rle('aaab')", expected: "'a3b1'"}
+  - {call: "rle('')", expected: "''"}
+  - {call: "rle('abc')", expected: "'a1b1c1'"}

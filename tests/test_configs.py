@@ -81,5 +81,6 @@ def test_privacy_minimums() -> None:
     assert privacy["pseudonym"]["prefix_synthetic"] == "SYN-"
     assert "OneDrive" in privacy["forbidden_data_root_markers"]
     # Open decisions stay explicit until the lead decides (SPEC section 15).
-    assert "retention_days" in privacy
+    assert "retention_days_after_project_end" in privacy
+    assert privacy["real_collection_enabled"] is False  # flips only after ethics approval
     assert "data_root" in privacy

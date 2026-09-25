@@ -1,0 +1,13 @@
+id: practice_word_count
+kind: practice
+title: Word count
+statement: |
+  Write a function `word_count(text)` that returns a dict mapping each lower-cased word to the
+  number of times it appears. Words are separated by whitespace.
+starter: |
+  def word_count(text):
+      pass
+tests:
+  - {call: "word_count('a b a')", expected: "{'a': 2, 'b': 1}"}
+  - {call: "word_count('')", expected: "{}"}
+  - {call: "word_count('Go go GO')", expected: "{'go': 3}"}
