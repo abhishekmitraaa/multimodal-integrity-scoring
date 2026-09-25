@@ -44,9 +44,20 @@ def test_multi_change_event_applied_against_pre_event_document() -> None:
         (0, "content_change", change(2, 0, 0, "#", idx=0, n=2)),
         (1, "content_change", change(2, 3, 0, "#", idx=1, n=2)),
     ]
-    # The segment_start snapshot seeds the document (it "mismatches" the empty start and is adopted).
+    # The first segment_start snapshot (starter code) is the base document, not a mismatch.
     rep = replay([(0, "snapshot", snapshot("ab\ncd", "segment_start"))] + [(s + 1, t, d) for s, t, d in events])
     assert rep.doc.text == "#ab\n#cd"
+    assert rep.mismatches == [] and rep.checks[0].reason == "base"
+
+
+def test_reload_snapshot_that_differs_from_replay_is_a_mismatch() -> None:
+    events = [
+        (0, "snapshot", snapshot("def f():", "segment_start")),
+        (1, "content_change", change(2, 8, 0, " pass")),
+        (2, "snapshot", snapshot("something else", "segment_start")),  # reload restored other text
+    ]
+    r = replay(events)
+    assert [c.server_seq for c in r.mismatches] == [2]
 
 
 def test_undo_is_just_another_change() -> None:

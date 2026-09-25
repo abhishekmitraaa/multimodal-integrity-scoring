@@ -2,7 +2,7 @@
 
 FastAPI server: the source of truth for the event log.
 
-## Planned modules (P1 onward)
+## Modules
 
 | Module | Responsibility | SPEC |
 |---|---|---|

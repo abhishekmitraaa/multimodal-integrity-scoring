@@ -123,6 +123,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def editor_policy() -> dict[str, Any]:
         return policy
 
+    @app.get("/api/client-config")
+    async def client_config() -> dict[str, Any]:
+        """Everything the capture client needs from config/, so the browser hard-codes nothing."""
+        return {"policy": policy, "capture": settings.capture}
+
     @app.get("/api/problems/{problem_id}")
     async def problem(problem_id: str) -> dict[str, Any]:
         if problem_id not in problems:

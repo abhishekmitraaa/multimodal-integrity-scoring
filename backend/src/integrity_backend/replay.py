@@ -63,6 +63,7 @@ class Replayer:
     checks: list[SnapshotCheck] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     _group: list[dict[str, Any]] = field(default_factory=list)
+    _applied_any: bool = False
 
     def feed(self, server_seq: int, etype: str, data: dict[str, Any]) -> None:
         if etype == "content_change":
@@ -84,6 +85,7 @@ class Replayer:
         if not self._group:
             return
         group, self._group = self._group, []
+        self._applied_any = True
         if len({c["version_id"] for c in group}) != 1 or len(group) != group[0]["n"]:
             self.errors.append(f"incomplete multi-change group before server_seq {server_seq}")
         for change in sorted(group, key=lambda c: c["offset"], reverse=True):
@@ -96,6 +98,11 @@ class Replayer:
                 self.errors.append(f"server_seq {server_seq}: {exc}")
 
     def _check_snapshot(self, server_seq: int, data: dict[str, Any]) -> None:
+        if data["reason"] == "segment_start" and not self._applied_any and len(self.doc) == 0:
+            # The first page load starts from starter code that was never typed: it is the base.
+            self.doc = Utf16Doc(data["text"])
+            self.checks.append(SnapshotCheck(server_seq, "base", True, data["sha256"], data["sha256"]))
+            return
         replayed = text_sha256(self.doc.text)
         ok = replayed == data["sha256"]
         self.checks.append(SnapshotCheck(server_seq, data["reason"], ok, data["sha256"], replayed))
