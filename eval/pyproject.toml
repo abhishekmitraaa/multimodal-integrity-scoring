@@ -7,7 +7,8 @@ name = "integrity-eval"
 version = "0.0.1"
 requires-python = ">=3.11,<3.12"
 # Dependencies are added in the phase that first uses them, together with tests.
-dependencies = []
+# integrity-ml is also imported; it is installed from this repository (README setup), not from PyPI.
+dependencies = ["numpy>=1.26", "PyYAML>=6"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]

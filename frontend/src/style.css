@@ -183,3 +183,10 @@ button:disabled {
 .monaco-editor .find-widget > .replace-part {
   display: none !important;
 }
+
+/* Real-keyboard check page (development data only, docs/keycheck.md). */
+.keycheck-editor {
+  height: 180px;
+  border: 1px solid var(--line);
+  margin-top: 16px;
+}

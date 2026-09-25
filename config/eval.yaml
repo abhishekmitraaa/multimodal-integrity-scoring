@@ -11,3 +11,10 @@ bootstrap:
 false_flag_rate: 0.05
 attacks: [A1, A2, A3a, A3b, A4, A5, A6, A7, A8]
 test_ledger: eval/ledger/test_access.jsonl
+keycheck:                        # real-keyboard check report, development data only (docs/keycheck.md)
+  normal_tasks: [prose, code]    # tasks used for overlap and clock-agreement statistics
+  min_jank_keydowns: 20          # fewer keydowns in task 4 gives "not enough data"
+  input_time_min_inside_frac: 0.15   # >= this share of task-4 keydowns stamped inside a main-thread block: timeStamp is the input time
+  dispatch_time_max_inside_frac: 0.02
+  dispatch_time_max_lag_ms: 2.0      # and a median lag below this: timeStamp is the dispatch time
+  top_overlap_pairs: 5

@@ -1,6 +1,6 @@
 // Unit tests for pure modules, run by the Playwright Test runner (D-009). Inputs are SYNTHETIC.
 import { expect, test } from "@playwright/test";
-import { parseUserAgent } from "../../src/capture/device";
+import { browserVersion, parseUserAgent } from "../../src/capture/device";
 import { isBlockedKey, keyCategory, modifierMask, safeCode, type BlockedKey } from "../../src/capture/keys";
 import { EventLog } from "../../src/capture/log";
 import { replayText } from "../../src/replay";
@@ -21,6 +21,21 @@ test.describe("key categories (SPEC 4.6)", () => {
   test("code sanitised to schema alphabet", () => {
     expect(safeCode("KeyA")).toBe("KeyA");
     expect(safeCode("Weird-Key!")).toBe("WeirdKey");
+  });
+});
+
+test.describe("browser brand and version (D-025)", () => {
+  const edgeUa = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0";
+  test("client hints tell Edge from Chrome", () => {
+    const brands = [{ brand: "Not=A?Brand", version: "99.0.0.0" }, { brand: "Chromium", version: "140.0.7339.80" }, { brand: "Microsoft Edge", version: "140.0.3485.54" }];
+    expect(browserVersion(brands, edgeUa)).toEqual({ brand: "edge", version: "140.0.3485.54" });
+    expect(browserVersion([{ brand: "Chromium", version: "140.0.7339.80" }, { brand: "Google Chrome", version: "140.0.7339.80" }], "")).toEqual({ brand: "chrome", version: "140.0.7339.80" });
+  });
+  test("UA fallback", () => {
+    expect(browserVersion(undefined, "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:143.0) Gecko/20100101 Firefox/143.0")).toEqual({ brand: "firefox", version: "143.0" });
+    expect(browserVersion(undefined, edgeUa)).toEqual({ brand: "edge", version: "140.0.0.0" });
+    expect(browserVersion(undefined, "Mozilla/5.0 (Macintosh) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15")).toEqual({ brand: "safari", version: "26.0" });
+    expect(browserVersion(undefined, "curl/8")).toEqual({ brand: "other", version: "" });
   });
 });
 

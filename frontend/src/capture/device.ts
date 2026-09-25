@@ -42,6 +42,44 @@ export function parseUserAgent(ua: string): Pick<DeviceInfo, "os_family" | "brow
   return { os_family, browser_family, browser_major: major };
 }
 
+export interface BrowserVersion {
+  brand: "chrome" | "edge" | "chromium" | "firefox" | "safari" | "other";
+  version: string;
+}
+
+/**
+ * Browser brand and full version. Chromium reports brands through User-Agent Client Hints
+ * (fullVersionList), which tells Edge from Chrome; other browsers fall back to the UA string.
+ */
+export function browserVersion(brands: Array<{ brand: string; version: string }> | undefined, ua: string): BrowserVersion {
+  for (const [name, brand] of [["Microsoft Edge", "edge"], ["Google Chrome", "chrome"], ["Chromium", "chromium"]] as const) {
+    const hit = brands?.find((b) => b.brand === name);
+    if (hit) return { brand, version: hit.version };
+  }
+  const firefox = ua.match(/Firefox\/([\d.]+)/);
+  if (firefox) return { brand: "firefox", version: firefox[1] };
+  const edge = ua.match(/Edg\/([\d.]+)/);
+  if (edge) return { brand: "edge", version: edge[1] };
+  const chrome = ua.match(/Chrome\/([\d.]+)/);
+  if (chrome) return { brand: "chrome", version: chrome[1] };
+  const safari = ua.match(/Version\/([\d.]+).*Safari/);
+  if (safari) return { brand: "safari", version: safari[1] };
+  return { brand: "other", version: "" };
+}
+
+export async function detectBrowserVersion(): Promise<BrowserVersion> {
+  const uaData = (navigator as unknown as {
+    userAgentData?: { getHighEntropyValues(hints: string[]): Promise<{ fullVersionList?: Array<{ brand: string; version: string }> }> };
+  }).userAgentData;
+  let brands: Array<{ brand: string; version: string }> | undefined;
+  try {
+    brands = (await uaData?.getHighEntropyValues(["fullVersionList"]))?.fullVersionList;
+  } catch {
+    brands = undefined;
+  }
+  return browserVersion(brands, navigator.userAgent);
+}
+
 interface KeyboardLayoutMap {
   get(code: string): string | undefined;
 }
