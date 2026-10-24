@@ -894,17 +894,18 @@ same information as the code itself, and it is disclosed in the notice.
   snapshots, review notes and appeal notes. The associated data is `session_id‖server_seq`, so a
   ciphertext cannot be moved to another row undetected. The database lives in a Docker named
   volume, not in the repository.
-- **Where the field key is today [OPEN, D-028].** `data_key.bin` (32 random bytes from
-  `scripts/make_secrets.py`) sits in `C:\dev\integrity-exam\secrets\`. That is **inside the
-  repository folder**. It is git-ignored and has never been committed (only `secrets/README.md` is
-  tracked). The folder is not under OneDrive (`C:\Users\…\OneDrive`), but it is still in the repo.
-  **There is no backup.** If the file is lost, every encrypted event payload becomes unreadable.
-  Today that affects only DEV and SYN data. The requirement is that the key is in neither the repo
-  nor a synced folder. The proposed fix: move `secrets/` to a folder outside the repo and outside
-  sync; point `INTEGRITY_SECRETS_DIR` at it (the backend already reads this variable); make the
-  backend refuse a secrets folder inside the repo or a sync root, as it already does for the data
-  root; and keep one offline encrypted backup held by a named person. This waits for the lead's
-  decision.
+- **Secrets location and backup [DECIDED D-028].** The field key `data_key.bin`, the database
+  password and the staff tokens live in `INTEGRITY_SECRETS_DIR`, by default
+  `~/.integrity-exam/secrets`. They moved there from the repository folder on 2026-10-24; they
+  were git-ignored and never committed. The backend, test fixtures, `make_secrets.py` and
+  docker-compose all use the same rule. The backend refuses a secrets folder inside the repository
+  or in a cloud-synced folder.
+  - **Backup:** `scripts/backup_secrets.py` writes one passphrase-encrypted file (scrypt + AES-256-GCM)
+    and refuses a target in the repo or a synced folder. The lead keeps it on an offline drive,
+    with the passphrase in a password manager, never stored next to the file. `verify` checks a
+    backup; `restore` never overwrites.
+  - Without the key, encrypted payloads are unreadable. A new backup is needed whenever the
+    secrets change.
 - **Data root [DECIDED Q1].** Exported datasets and files live under `INTEGRITY_DATA_ROOT`, outside
   the repository, and are written encrypted. The disk should also be encrypted (BitLocker or Device
   Encryption). As of P0 this machine's disk-encryption status is **unknown**: the check needs admin
@@ -1155,7 +1156,7 @@ See [DECISIONS.md](DECISIONS.md) for the full log.
 | Q4: data governance | **Open.** With the faculty guide via the governance one-pager: retention N, identity-map custodian, named responsible party, reviewers outside the team. |
 | Q5: evaluation | **Decided with changes.** Nested user-level CV; cluster bootstrap over users; exact TypeNet protocol documented before P2 training (§12.7). |
 | P1 review | **Decided.** COOP/COEP by default, the same for all sessions, no accuracy claim (D-021). Chromium and Firefox only, same browser both sittings (D-025). Threat-model additions and mandatory P3 reconciliation (D-026). Replace disabled, `unknown` is a flag (D-027). Aalto licence requested by the lead. |
-| Field-key location and backup | **Open (D-028).** The key is inside the repo folder with no backup (§10.6). |
+| Field-key location and backup | **Decided (D-028).** Moved out of the repo; guarded; encrypted offline backup script (§10.6). The lead makes the first backup. |
 | P2 modelling questions | **Open.** Four questions in [p2_protocol.md](p2_protocol.md) §12. |
 
 ---

@@ -1,5 +1,6 @@
 # Local development database. The backend runs on the host (uvicorn) during P1.
 # Create local secrets first:  python scripts/make_secrets.py
+# Secrets live outside the repo (D-028): INTEGRITY_SECRETS_DIR, else ~/.integrity-exam/secrets.
 services:
   db:
     image: postgres:16
@@ -18,7 +19,7 @@ services:
 
 secrets:
   pg_password:
-    file: ./secrets/pg_password.txt
+    file: ${INTEGRITY_SECRETS_DIR:-${USERPROFILE:-${HOME}}/.integrity-exam/secrets}/pg_password.txt
 
 volumes:
   pgdata:

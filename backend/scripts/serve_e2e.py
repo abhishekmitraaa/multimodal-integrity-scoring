@@ -17,12 +17,14 @@ import uvicorn
 from alembic import command
 from alembic.config import Config
 
+from integrity_backend.settings import resolve_secrets_dir
+
 REPO = Path(__file__).resolve().parents[2]
 DB = "integrity_e2e"
 
 
 def main() -> None:
-    password = (REPO / "secrets" / "pg_password.txt").read_text(encoding="utf-8").strip()
+    password = (resolve_secrets_dir() / "pg_password.txt").read_text(encoding="utf-8").strip()
     admin_dsn = f"postgresql://integrity:{password}@127.0.0.1:5432/integrity"
 
     async def reset() -> None:

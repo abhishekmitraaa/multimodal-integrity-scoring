@@ -33,13 +33,13 @@ the bottom. See [SPEC.md](SPEC.md) for context.
 | D-025 | Study browsers: Chromium-based (Chrome, Edge) and Firefox only. Safari is out of scope. The same browser is required in both sittings. Browser brand and version are logged as covariates. | accepted (P1 review) | SPEC 1.3, 12.2 |
 | D-026 | Threat model: the browser owner can forge any client-side telemetry; `isTrusted` is not a defence; the hash chain covers only post-receipt tampering. **Server-side reconciliation of content deltas against keydowns is mandatory in P3**: an insertion without matching evidence (for example a large insert with no keydowns) is flagged whatever the client's label says. | accepted (lead, P1 review) | SPEC 1.2, 4.7, 9.2, 9.4, 13 |
 | D-027 | Find/replace: the replace toggle and row are hidden, and every Monaco replace shortcut is blocked by an enforced `blocked_keys` list (replacing the never-applied `disabled_commands`). A replace that still happens is labelled with the new cause `find_replace`. `unknown` and `find_replace` insertions are flags and count as untyped insertion. The schema's cause enum gains `find_replace` (additive; `schema_version` stays 1.0 because no real data exists). | accepted (lead instruction; mechanism proposed) | SPEC 4.7, 4.8, 11 |
-| D-028 | Field-encryption key location and backup. Today it is in `secrets/` inside the repo folder (git-ignored, never committed) with no backup. Proposed: move it outside the repo and sync, use `INTEGRITY_SECRETS_DIR`, add a backend guard, and keep one offline encrypted backup held by a named person. | open | SPEC 10.6 |
+| D-028 | Secrets live outside the repo and sync: `INTEGRITY_SECRETS_DIR`, default `~/.integrity-exam/secrets` (moved 2026-10-24). The backend refuses a secrets folder in the repo or a synced folder. `scripts/backup_secrets.py` makes a passphrase-encrypted backup (scrypt + AES-256-GCM) kept offline by the lead, with the passphrase in a password manager. | accepted (lead delegated the decision) | SPEC 10.6 |
 | D-029 | The P2 TypeNet reproduction follows the protocol checked against arXiv:2101.05570v3 (Eq. 5 scoring, per-subject EER, k = 1,000, the paper's G grid) with the deviations listed in p2_protocol.md §9. `learning_rate` corrected from 0.005 to 0.05. | proposed | p2_protocol.md |
 | D-030 | The real-keyboard check page (`#/keycheck`) records locally and saves a file labelled `dataset: development`, `not_for_study: true`. It never talks to the server. Files live only under the data root, and the report refuses anything else. Team members only. | proposed | keycheck.md |
 
 ## Open
 
-- **D-028: where the field key lives and how it is backed up.** See SPEC 10.6.
+- **First secrets backup** (D-028): the lead runs `scripts/backup_secrets.py backup` onto an offline drive.
 - **P2 modelling questions** (baseline at small G, scoring rule, recurrent dropout, TypeNet
   Benchmark licence). See p2_protocol.md §12.
 - **Q4: data governance** (retention N, identity-map custodian, named responsible party, reviewers

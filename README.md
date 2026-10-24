@@ -68,7 +68,7 @@ Node 22+ and Docker Desktop.
 ```bash
 py -3.11 -m venv .venv
 .venv/Scripts/python -m pip install -r requirements-dev.txt -e "backend[dev]" -e ml -e eval
-.venv/Scripts/python scripts/make_secrets.py        # local keys and tokens in secrets/ (git-ignored)
+.venv/Scripts/python scripts/make_secrets.py        # keys and tokens in ~/.integrity-exam/secrets (outside the repo)
 docker compose up -d db                              # PostgreSQL 16 on 127.0.0.1:5432
 cd frontend && npm install && npx playwright install chromium firefox webkit
 ```
@@ -86,7 +86,7 @@ cd frontend; npm run dev
 
 Open http://127.0.0.1:5173. It creates `DEV-` participants. Real participants are refused until
 `real_collection_enabled` is set after ethics approval. The reviewer replay page is at `#/replay`,
-using the token in `secrets/reviewer_token.txt`. The real-keyboard check is at `#/keycheck`. It needs
+using the token in `~/.integrity-exam/secrets/reviewer_token.txt`. The real-keyboard check is at `#/keycheck`. It needs
 only the web app, not the backend, and its files are development data ([docs/keycheck.md](docs/keycheck.md)).
 
 ## Running the tests

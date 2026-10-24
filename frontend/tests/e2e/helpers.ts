@@ -1,10 +1,12 @@
 // Shared helpers for end-to-end tests. Every participant created here is kind "synthetic".
 import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { expect, type APIRequestContext, type Page } from "@playwright/test";
 
-export const REVIEWER_TOKEN = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "secrets", "reviewer_token.txt"), "utf8").trim();
+// Same rule as the backend (D-028): INTEGRITY_SECRETS_DIR, else ~/.integrity-exam/secrets.
+const SECRETS_DIR = process.env.INTEGRITY_SECRETS_DIR || join(homedir(), ".integrity-exam", "secrets");
+export const REVIEWER_TOKEN = readFileSync(join(SECRETS_DIR, "reviewer_token.txt"), "utf8").trim();
 export const API = "http://127.0.0.1:8000";
 
 export interface ServerEvent {

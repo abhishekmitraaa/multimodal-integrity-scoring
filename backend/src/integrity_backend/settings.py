@@ -1,4 +1,8 @@
-"""Runtime settings: YAML config from config/, secrets from secrets/, environment overrides."""
+"""Runtime settings: YAML config from config/, secrets from the secrets folder, environment overrides.
+
+The secrets folder is INTEGRITY_SECRETS_DIR, or ~/.integrity-exam/secrets by default. It must be
+outside the repository and outside any cloud-synced folder (D-028, SPEC 10.6).
+"""
 
 from __future__ import annotations
 
@@ -9,9 +13,10 @@ from typing import Any, Mapping
 
 import yaml
 
-from .guard import check_data_root
+from .guard import check_data_root, check_secrets_dir
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_SECRETS_DIR = Path.home() / ".integrity-exam" / "secrets"
 
 
 def load_config(name: str) -> dict[str, Any]:
@@ -32,9 +37,17 @@ class Settings:
     editor_policy: dict[str, Any]
 
 
+def resolve_secrets_dir(env: Mapping[str, str] | None = None) -> Path:
+    """The guarded secrets folder. Also used by scripts and test fixtures."""
+    env = os.environ if env is None else env
+    raw = env.get("INTEGRITY_SECRETS_DIR") or str(DEFAULT_SECRETS_DIR)
+    markers = load_config("privacy")["forbidden_data_root_markers"]
+    return check_secrets_dir(Path(raw).expanduser(), REPO_ROOT, markers)
+
+
 def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     env = os.environ if env is None else env
-    secrets_dir = Path(env.get("INTEGRITY_SECRETS_DIR", REPO_ROOT / "secrets"))
+    secrets_dir = resolve_secrets_dir(env)
     privacy = load_config("privacy")
 
     database_url = env.get("DATABASE_URL", "")

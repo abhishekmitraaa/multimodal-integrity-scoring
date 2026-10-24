@@ -15,7 +15,9 @@ REPO = Path(__file__).resolve().parents[2]
 
 
 def _dsn(db: str) -> str:
-    password = (REPO / "secrets" / "pg_password.txt").read_text(encoding="utf-8").strip()
+    from integrity_backend.settings import resolve_secrets_dir
+
+    password = (resolve_secrets_dir() / "pg_password.txt").read_text(encoding="utf-8").strip()
     return f"postgresql://integrity:{password}@127.0.0.1:5432/{db}"
 
 
