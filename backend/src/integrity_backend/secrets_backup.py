@@ -54,17 +54,32 @@ def unpack(blob: bytes, passphrase: str) -> dict[str, bytes]:
     return {name: base64.b64decode(content) for name, content in json.loads(plaintext).items()}
 
 
+def write_secret(path: Path, content: bytes) -> None:
+    """Create a new file readable by the owner only (0600). Fails if it already exists (O_EXCL).
+
+    On Windows the mode bits are mostly ignored; the file inherits the folder's ACL, which under the
+    user profile is limited to the user, SYSTEM and administrators.
+    """
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0), 0o600)
+    with os.fdopen(fd, "wb") as f:
+        f.write(content)
+
+
 def restore(blob: bytes, passphrase: str, folder: Path) -> list[Path]:
     """Write the backed-up files into folder. Refuses to overwrite an existing file."""
     files = unpack(blob, passphrase)
+    unsafe = [name for name in files if Path(name).name != name or name in ("", ".", "..")]
+    if unsafe:
+        raise BackupError(f"unsafe file name in backup: {unsafe[0]!r}")
     clashes = [name for name in files if (folder / name).exists()]
     if clashes:
         raise BackupError(f"refusing to overwrite existing files: {', '.join(sorted(clashes))}")
-    folder.mkdir(parents=True, exist_ok=True)
+    folder.mkdir(mode=0o700, parents=True, exist_ok=True)
     written = []
     for name, content in files.items():
-        if Path(name).name != name:
-            raise BackupError(f"unsafe file name in backup: {name!r}")
-        (folder / name).write_bytes(content)
+        try:
+            write_secret(folder / name, content)
+        except FileExistsError as err:
+            raise BackupError(f"refusing to overwrite existing file: {name}") from err
         written.append(folder / name)
     return written

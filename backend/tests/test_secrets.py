@@ -73,6 +73,17 @@ def test_backup_rejects_wrong_passphrase_tampering_and_overwrite(tmp_path: Path)
         restore(blob, PASS, tmp_path / "src")
 
 
+def test_write_secret_never_overwrites(tmp_path: Path) -> None:
+    from integrity_backend.secrets_backup import write_secret
+
+    write_secret(tmp_path / "k", b"one")
+    with pytest.raises(FileExistsError):
+        write_secret(tmp_path / "k", b"two")
+    assert (tmp_path / "k").read_bytes() == b"one"
+    if os.name == "posix":
+        assert (tmp_path / "k").stat().st_mode & 0o777 == 0o600
+
+
 def test_backup_needs_a_long_passphrase(tmp_path: Path) -> None:
     _secrets(tmp_path / "src")
     with pytest.raises(BackupError, match="at least"):

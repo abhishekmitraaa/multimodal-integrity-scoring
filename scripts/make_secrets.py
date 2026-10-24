@@ -11,21 +11,23 @@ from __future__ import annotations
 import secrets
 from pathlib import Path
 
+from integrity_backend.secrets_backup import write_secret
 from integrity_backend.settings import resolve_secrets_dir
 
 
 def write_once(folder: Path, name: str, content: bytes) -> None:
     path = folder / name
-    if path.exists():
+    try:
+        write_secret(path, content)   # owner-only, never overwrites
+    except FileExistsError:
         print(f"kept    {path}")
         return
-    path.write_bytes(content)
     print(f"created {path}")
 
 
 def main() -> None:
     folder = resolve_secrets_dir()
-    folder.mkdir(parents=True, exist_ok=True)
+    folder.mkdir(mode=0o700, parents=True, exist_ok=True)
     write_once(folder, "pg_password.txt", secrets.token_urlsafe(24).encode())
     write_once(folder, "data_key.bin", secrets.token_bytes(32))          # AES-256-GCM field key
     write_once(folder, "reviewer_token.txt", secrets.token_urlsafe(32).encode())
