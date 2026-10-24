@@ -77,19 +77,38 @@ cd frontend && npm install && npx playwright install chromium firefox webkit
 
 ## Running the app locally (development data only)
 
+One command, from the repository root, starts everything in order:
+
 ```powershell
-# terminal 1 (PowerShell): data root, database schema, then the API on :8000
-$env:INTEGRITY_DATA_ROOT = "C:\integrity-data"      # must be outside the repo and cloud sync
-.venv\Scripts\python -m alembic -c backend\alembic.ini upgrade head
-.venv\Scripts\python -m integrity_backend.app
-# terminal 2: the web app on :5173, cross-origin isolated by default ($env:COI = "0" only to measure without)
-cd frontend; npm run dev
+powershell -ExecutionPolicy Bypass -File scripts\dev.ps1
 ```
 
-Open http://127.0.0.1:5173. It creates `DEV-` participants. Real participants are refused until
-`real_collection_enabled` is set after ethics approval. The reviewer replay page is at `#/replay`,
-using the token in `~/.integrity-exam/secrets/reviewer_token.txt`. The real-keyboard check is at `#/keycheck`. It needs
-only the web app, not the backend, and its files are development data ([docs/keycheck.md](docs/keycheck.md)).
+It starts Docker Desktop if needed, waits for the database, sets `INTEGRITY_DATA_ROOT`
+(`C:\integrity-data` unless already set; `-DataRoot D:\...` to change it) and runs the migrations.
+Then it starts the **backend API on :8000 in its own window** and the **web app on :5173** in this
+window, cross-origin isolated. It stops with a plain message if any step fails. To stop
+everything, press Ctrl+C and close the backend window.
+
+| Page | URL | Needs the backend |
+|---|---|---|
+| App: consent → tasks → Run/Test → Submit → "Another task" | http://127.0.0.1:5173/ | **yes** |
+| Real-keyboard check ([docs/keycheck.md](docs/keycheck.md)) | http://127.0.0.1:5173/#/keycheck | no |
+| Reviewer replay (token in `~/.integrity-exam/secrets/reviewer_token.txt`) | http://127.0.0.1:5173/#/replay | yes |
+
+The app creates `DEV-` participants. Real participants are refused until `real_collection_enabled`
+is set after ethics approval. If the backend isn't running, the consent page says so at the top and
+disables Continue.
+
+<details><summary>Manual steps (what the script does)</summary>
+
+```powershell
+docker compose up -d db
+$env:INTEGRITY_DATA_ROOT = "C:\integrity-data"      # must be outside the repo and cloud sync
+.venv\Scripts\python -m alembic -c backendlembic.ini upgrade head
+.venv\Scripts\python -m integrity_backend.app       # terminal 1: API on :8000
+cd frontend; npm run dev                            # terminal 2: web app on :5173 ($env:COI = "0" only to measure without isolation)
+```
+</details>
 
 ## Running the tests
 

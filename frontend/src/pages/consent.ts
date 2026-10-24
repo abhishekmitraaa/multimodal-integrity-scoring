@@ -1,7 +1,7 @@
 // Consent screen. DRAFT: the final notice needs the faculty guide's answers (Q4) and ethics approval.
 // Until then the backend refuses real participants; this page creates "dev" or "synthetic" ones.
 
-import { api } from "../api";
+import { api, SERVER_DOWN_MESSAGE, ServerUnavailableError } from "../api";
 import { sha256Hex } from "../capture/hash";
 import { h } from "../dom";
 import { store } from "../state";
@@ -24,7 +24,7 @@ export function consentPage(root: HTMLElement): void {
   const kind = new URLSearchParams(location.search).get("kind") === "synthetic" ? "synthetic" : "dev";
   const age = h("input", { type: "checkbox", id: "age" });
   const agree = h("input", { type: "checkbox", id: "agree" });
-  const error = h("p", { class: "error" });
+  const error = h("p", { class: "error", id: "consent-error" });
   const start = h("button", {
     id: "consent-continue",
     onclick: async () => {
@@ -46,9 +46,18 @@ export function consentPage(root: HTMLElement): void {
     },
   }, "Continue");
 
+  // Check the server before anyone fills in the form, so a missing backend is obvious at once.
+  const serverDown = h("p", { class: "banner error", id: "server-down", role: "alert", hidden: true });
+  api.health().catch((err: unknown) => {
+    serverDown.textContent = err instanceof ServerUnavailableError ? SERVER_DOWN_MESSAGE : `Server check failed: ${String(err)}`;
+    serverDown.hidden = false;
+    start.setAttribute("disabled", "");
+  });
+
   root.replaceChildren(
     h("main", { class: "narrow" },
       h("h1", {}, "Coding practice study"),
+      serverDown,
       h("p", { class: "banner" }, `Development build. Participant kind: ${kind}. Real data collection is disabled until ethics approval.`),
       h("pre", { class: "notice", id: "notice" }, NOTICE),
       h("label", {}, age, " I am 18 or older."),

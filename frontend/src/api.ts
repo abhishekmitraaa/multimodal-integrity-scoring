@@ -18,16 +18,38 @@ export interface CaptureSettings {
   cursor_event_throttle_ms: number;
 }
 
+export const SERVER_DOWN_MESSAGE =
+  "The study server is not running or cannot be reached. Start everything with scripts\\dev.ps1 " +
+  "(see README, \"Running the app locally\"), then reload this page.";
+
+/** The backend is not reachable: nothing listens on :8000 (the Vite proxy answers 502/503/504). */
+export class ServerUnavailableError extends Error {
+  constructor() {
+    super(SERVER_DOWN_MESSAGE);
+    this.name = "ServerUnavailableError";
+  }
+  override toString(): string {
+    return this.message;
+  }
+}
+
 async function call<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
   const headers = new Headers(init.headers);
   if (init.body) headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  const res = await fetch(path, { ...init, headers });
+  let res: Response;
+  try {
+    res = await fetch(path, { ...init, headers });
+  } catch {
+    throw new ServerUnavailableError();   // connection refused, network down
+  }
+  if ([502, 503, 504].includes(res.status)) throw new ServerUnavailableError();
   if (!res.ok) throw new Error(`${init.method ?? "GET"} ${path}: ${res.status} ${await res.text()}`);
   return (await res.json()) as T;
 }
 
 export const api = {
+  health: () => call<{ status: string }>("/api/health"),
   clientConfig: () => call<{ policy: EditorPolicy; capture: CaptureSettings }>("/api/client-config"),
   problem: (id: string) => call<Problem>(`/api/problems/${id}`),
   createParticipant: (body: unknown) =>

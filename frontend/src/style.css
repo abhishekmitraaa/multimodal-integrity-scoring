@@ -87,6 +87,10 @@ button:disabled {
   background: var(--panel);
 }
 
+.banner.error {
+  border-left-color: var(--error);
+}
+
 .notice {
   white-space: pre-wrap;
   background: var(--panel);
@@ -189,4 +193,21 @@ button:disabled {
   height: 180px;
   border: 1px solid var(--line);
   margin-top: 16px;
+}
+
+.keycheck-now {
+  margin-top: 16px;
+  padding: 8px 12px;
+  border-left: 4px solid var(--ok);
+  background: var(--panel);
+}
+
+.keycheck-now h2 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+
+.keycheck-now .notice {
+  margin: 6px 0 0;
+  max-height: 140px;
 }

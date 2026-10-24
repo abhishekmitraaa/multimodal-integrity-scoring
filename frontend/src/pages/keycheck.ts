@@ -87,6 +87,8 @@ export async function keycheckPage(root: HTMLElement, params: URLSearchParams): 
   const status = h("p", { id: "kc-status", class: "status" }, "Not recording.");
   const error = h("p", { class: "error" });
   const host = h("div", { id: "kc-editor", class: "keycheck-editor" });
+  // The active task, repeated right above the typing box so both are on screen together.
+  const now = h("section", { id: "kc-now", class: "keycheck-now", hidden: true });
   const finishBtn = h("button", { id: "kc-finish", disabled: true }, "Finish task");
   const downloadBtn = h("button", { id: "kc-download", class: "primary", disabled: true }, "Save file");
 
@@ -119,6 +121,7 @@ export async function keycheckPage(root: HTMLElement, params: URLSearchParams): 
         t.text ? h("pre", { class: "notice" }, t.text) : null,
         h("div", { class: "row" }, startButtons[i]),
       )),
+      now,
       host,
       h("div", { class: "row" }, finishBtn, downloadBtn),
       status,
@@ -145,6 +148,7 @@ export async function keycheckPage(root: HTMLElement, params: URLSearchParams): 
     if (!active) return;
     window.clearInterval(jankTimer);
     tasks.push({ id: active.id, start_ms: active.start, end_ms: performance.now(), keydowns: active.keydowns });
+    now.hidden = true;
     status.textContent = `Finished task "${active.id}" (${active.keydowns} key presses). Tasks done: ${tasks.map((t) => t.id).join(", ")}.`;
     active = null;
     finishBtn.setAttribute("disabled", "");
@@ -164,6 +168,11 @@ export async function keycheckPage(root: HTMLElement, params: URLSearchParams): 
     }
     finishBtn.removeAttribute("disabled");
     status.textContent = `Recording task "${t.id}". Click "Finish task" when done.`;
+    now.replaceChildren(
+      h("h2", {}, `Now: ${t.title}`), h("p", {}, t.steps), ...(t.text ? [h("pre", { class: "notice" }, t.text)] : []),
+    );
+    now.hidden = false;
+    now.scrollIntoView({ block: "start" });
     editor.focus();
   }));
   finishBtn.addEventListener("click", finish);

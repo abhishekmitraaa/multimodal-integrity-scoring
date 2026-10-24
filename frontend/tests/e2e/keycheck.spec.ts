@@ -58,3 +58,18 @@ test("record the check tasks, save a development-data file, and report on it", a
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("Start brings the typing box and the task's text into view", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto("/#/keycheck?synthetic=1");
+  await expect(page.locator("#kc-editor .monaco-editor")).toBeVisible();
+  for (const task of ["prose", "code", "jank"]) {
+    await page.click(`#kc-start-${task}`);
+    await expect(page.locator("#kc-editor")).toBeInViewport({ ratio: 0.9 });
+    await expect(page.locator("#kc-now")).toBeInViewport();
+    await expect(page.locator("#kc-now")).toContainText(task === "code" ? "def count_words" : "The quick brown fox");
+    await page.keyboard.type("ab", { delay: 20 });            // focus is already in the editor
+    await expect(page.locator("#kc-status")).toContainText("2 key presses");
+    await page.click("#kc-finish");
+  }
+});
