@@ -223,16 +223,17 @@ plus the median HL per key. The distance to a query is the mean absolute differe
 items (Manhattan, divided by the number of shared items). The baseline is unavailable if fewer than
 5 items are shared.
 
-**Sparsity at small G (corrected 2026-10-24).** One sentence has about 70 keystrokes, so about 69
-digraphs, most of them unique. With G = 1 or 2, few digraphs reach 3 occurrences. v0.1 of this
-document predicted the baseline would therefore be unavailable for many comparisons. That was
-wrong for the baseline as specified: SPEC §7.2 also counts per-key hold times. Common keys (space,
-e, t) easily occur 3 times in 70 keystrokes, so 5 shared items are usually reached. In the
-synthetic pipeline check availability was 100% at every G. The real consequence is different: **at
-small G the baseline is mostly a hold-time comparison**, with few digraphs. The availability rate is
-still reported, and on D1 the share of digraph items versus key items will be reported too. The
-paper's own digraph comparison (digraph/SVM, a different method) was "near chance accuracy" at
-G = 5, M = 50 (§6.1).
+**Sparsity at small G (measured on D1, 2026-10-24).** One sentence has a median of 46 keystrokes
+(about 45 digraphs, most of them unique), so few items reach 3 occurrences.
+
+- **On D1 at G = 1, the SPEC §7.2 baseline could score only 65% of comparisons.** From G = 2 up it
+  scored 99–100%.
+- Earlier versions of this note first predicted widespread unavailability (v0.1), then "corrected"
+  that from synthetic data, where availability was 100% (v0.2). The synthetic generator has only
+  27 keys, so common keys repeat far more than in real text. **The real data decides:** the
+  baseline is often unavailable at G = 1, and at small G it is mostly a hold-time comparison.
+- The availability rate is reported with every result. TypeNet's own digraph comparison
+  (digraph/SVM, a different method) was "near chance accuracy" at G = 5, M = 50 (§6.1).
 
 **Pipeline check on labelled synthetic data (D3).** Before any real data, the baseline and the
 EER code run on generated users (filenames and figures marked SYNTHETIC; never reported as
