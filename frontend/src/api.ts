@@ -8,6 +8,8 @@ export interface Problem {
   title: string;
   statement: string;
   starter: string;
+  /** Practice tasks only: the code shown for the student to type (D-035). */
+  reference_solution?: string;
   tests: Array<{ call: string; expected: string }>;
 }
 

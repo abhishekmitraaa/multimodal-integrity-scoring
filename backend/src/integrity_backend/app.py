@@ -27,11 +27,25 @@ PROBLEMS_DIR = Path(__file__).resolve().parents[2] / "problems"
 
 
 def load_problems() -> dict[str, dict[str, Any]]:
+    """Problem files. Practice tasks must carry `reference_solution` (the code to type, D-035);
+    exam tasks must not."""
     problems = {}
     for path in sorted(PROBLEMS_DIR.glob("*.yaml")):
         problem = yaml.safe_load(path.read_text(encoding="utf-8"))
+        has_solution = "reference_solution" in problem
+        if problem["kind"] == "practice" and not has_solution:
+            raise ValueError(f"{path.name}: practice tasks need a reference_solution (D-035)")
+        if problem["kind"] == "exam" and has_solution:
+            raise ValueError(f"{path.name}: exam tasks must not carry a reference_solution")
         problems[problem["id"]] = problem
     return problems
+
+
+def public_problem(problem: dict[str, Any]) -> dict[str, Any]:
+    """What the browser may see. An exam task's solution is never sent, whatever the file says."""
+    if problem.get("kind") == "practice":
+        return problem
+    return {k: v for k, v in problem.items() if k != "reference_solution"}
 
 
 def policy_payload(policy: dict[str, Any]) -> dict[str, Any]:
@@ -132,7 +146,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def problem(problem_id: str) -> dict[str, Any]:
         if problem_id not in problems:
             raise HTTPException(404, "unknown problem")
-        return problems[problem_id]
+        return public_problem(problems[problem_id])
 
     @app.post("/api/participants")
     async def create_participant(body: ParticipantIn) -> dict[str, str]:

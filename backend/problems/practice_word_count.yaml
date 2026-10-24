@@ -7,6 +7,13 @@ statement: |
 starter: |
   def word_count(text):
       pass
+# Shown to the student to type (practice only, D-035). Must pass the tests below.
+reference_solution: |
+  def word_count(text):
+      counts = {}
+      for word in text.lower().split():
+          counts[word] = counts.get(word, 0) + 1
+      return counts
 tests:
   - {call: "word_count('a b a')", expected: "{'a': 2, 'b': 1}"}
   - {call: "word_count('')", expected: "{}"}

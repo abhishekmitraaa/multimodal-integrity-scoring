@@ -16,7 +16,7 @@ the bottom. See [SPEC.md](SPEC.md) for context.
 | D-008 | User-disjoint nested CV (5 outer folds, inner validation). Test-access ledger. | accepted (Q5) | SPEC 12.3 |
 | D-009 | Frontend unit tests use the Playwright Test runner rather than adding Vitest. | proposed | – |
 | D-010 | SQLAlchemy 2 + Alembic + asyncpg for database access. | proposed | SPEC 5 |
-| D-011 | Practice modules include a short transcription block (per-student transcription-mode profile aimed at A4). The awareness limitation is recorded in SPEC 1.4. | accepted (Q3) | SPEC 12.2 |
+| D-011 | *(Modified by D-035.)* Practice modules include a short transcription block (per-student transcription-mode profile aimed at A4). The awareness limitation is recorded in SPEC 1.4. | accepted (Q3) | SPEC 12.2 |
 | D-012 | Only participants aged 18 or over. | proposed | SPEC 10.1 |
 | D-013 | Fusion inputs are 7 modality-level distances plus 2 availability indicators. | proposed | SPEC 7.4 |
 | D-014 | Paste provenance (internal / problem statement / external) by normalised SHA-256 match. | proposed | SPEC 6.4 |
@@ -40,6 +40,7 @@ the bottom. See [SPEC.md](SPEC.md) for context.
 | D-032 | Deviation 6 amended: the encoder learning rate is chosen from {0.05 (paper), 0.01, 0.005} by per-subject EER on 1,000 validation subjects held out from the 68,000 D1 training subjects, before any test access. Reason: on synthetic data, 0.05 barely trains (EER 34.6% vs 5.6% with 0.005 at separation 1.0). | accepted (lead delegated the decision) | p2_protocol.md §9, §10 |
 | D-033 | Online scoring and the primary analysis of our data use the **prototype** distance (SPEC 7.3); TypeNet's Eq. 5 is the ablation on D2. Replaces the D-031 scoring choice. Reason: on D1 the rules agree within 0.05 points (prototype global EER equal or slightly lower), the prototype costs one distance per tick, and the deployed rule should be the evaluated one. Decided before any D2 data exists. | accepted (lead delegated the decision) | SPEC 7.3, p2_protocol §12 |
 | D-034 | **P2 approved** by the lead (2026-10-24). The human real-keyboard check stays open and runs alongside P3. | accepted | P2 report |
+| D-035 | Practice tasks show the full working code for the student to type (all practice is transcription), so nobody gets stuck. Exam tasks never: the server strips any solution from exam tasks, and the problem loader refuses one in an exam file. The code block can't be selected. Consequence: the enrollment baseline is copy-typing, so A4 detection is weaker and genuine exam composing may differ from the baseline (SPEC 1.4). | accepted (lead's decision, 2026-10-24; replaces part of D-011) | SPEC 1.4, 12.2 |
 
 ## Open
 

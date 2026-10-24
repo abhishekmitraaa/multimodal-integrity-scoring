@@ -82,6 +82,14 @@ Two more limits follow from the design:
   block, and A4 asks participants to copy-type. Participants therefore know copy-typing is being
   studied and may type differently from an unaware student. The transcription-mode profile may
   partly capture "typing while observed".
+- **The baseline is copying, not composing (D-035).** Practice tasks show the code to type, so each
+  student's enrollment profile is a transcription profile. Expected consequences, to be measured
+  and reported, not assumed:
+  - Weaker against copy-typing (A4): an exam typed from a second screen resembles the baseline.
+  - More false-flag risk for genuine exam work: composing has more pauses and revisions than
+    copying, so honest exam typing can differ from the baseline.
+  - Keystroke identity is less affected: the same hands still type both.
+  P3 treats the process features' baseline accordingly, and the paper states this.
 - **Small, local sample.** 50+ volunteers from one university, with mostly similar keyboards and
   layouts. Results do not generalise to other populations without new data.
 - **Client-side trust.** See section 1.2: someone who controls the browser can forge any telemetry,
@@ -1018,10 +1026,14 @@ Shown on the consent screen, the dashboard and in every report:
   exam session.
 - **Sitting 1 (~40 min).**
   1. Consent, then the device questionnaire.
-  2. Three practice modules. Each has (a) about 2 min of transcribing given code, which gives
-     digraph coverage **and the student's own transcription-mode profile**, and (b) about 8 min of
-     free coding.
+  2. Practice tasks. **[CHANGED D-035, lead's decision 2026-10-24]** Each practice task shows the
+     full working code, and the student types it, tests and submits, so nobody gets stuck. The
+     server never sends code for an exam task (`public_problem`), and the code block can't be
+     selected for copying. This replaces the earlier design of about 2 min of transcription plus
+     about 8 min of free coding. **All enrollment typing is now transcription.** See the
+     consequences in §1.4.
   3. Expected yield: about 1000+ keystrokes per module, so 5–10 baseline windows are easy to reach.
+     It may be lower now, because the given solutions are short; this is checked in the pilot.
 - **Sitting 2 (≥ 1 day later, ~60 min).** Short exam tasks, each under one condition. Order is
   counterbalanced (Latin square). Conditions: genuine ×2, A1, A4, A5, A7. A subset of participants
   does one genuine task on a different keyboard (A8).

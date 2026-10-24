@@ -1,0 +1,40 @@
+"""Problem files (D-035): practice tasks show code to type; exam tasks never reveal a solution."""
+
+from __future__ import annotations
+
+import ast
+from typing import Any
+
+import pytest
+
+from integrity_backend.app import load_problems, public_problem
+
+PROBLEMS = load_problems()
+PRACTICE = [p for p in PROBLEMS.values() if p["kind"] == "practice"]
+EXAMS = [p for p in PROBLEMS.values() if p["kind"] == "exam"]
+
+
+@pytest.mark.parametrize("problem", PRACTICE, ids=lambda p: p["id"])
+def test_practice_reference_solution_passes_its_own_tests(problem: dict[str, Any]) -> None:
+    code = problem["reference_solution"]
+    assert code.startswith(problem["starter"].splitlines()[0])   # same function header as the starter
+    scope: dict[str, Any] = {}
+    exec(code, scope)   # noqa: S102 - our own problem files
+    for t in problem["tests"]:
+        # eval only runs the call strings in our own problem files, against our own solution
+        assert eval(t["call"], scope) == ast.literal_eval(t["expected"]), t   # noqa: S307
+
+
+@pytest.mark.parametrize("problem", EXAMS, ids=lambda p: p["id"])
+def test_exam_problems_carry_no_solution(problem: dict[str, Any]) -> None:
+    assert "reference_solution" not in problem
+
+
+def test_server_never_sends_an_exam_solution_even_if_one_is_added() -> None:
+    leaked = {**EXAMS[0], "reference_solution": "def rle(s):\n    return s\n"}
+    assert "reference_solution" not in public_problem(leaked)
+    assert public_problem(PRACTICE[0])["reference_solution"] == PRACTICE[0]["reference_solution"]
+
+
+def test_there_are_practice_and_exam_problems() -> None:
+    assert PRACTICE and EXAMS

@@ -27,9 +27,21 @@ export async function sessionPage(root: HTMLElement, sessionId: string): Promise
 
   const status = h("span", { id: "status", class: "status" }, "connecting");
   const output = h("pre", { id: "output", class: "output" });
+  // Practice tasks show the code to type, so nobody gets stuck (D-035). The server never sends
+  // one for an exam task. The block can't be selected, so it is typed, not copied.
+  const reference = problem.reference_solution
+    ? [
+      h("h3", {}, "Code to type"),
+      h("p", { class: "muted", id: "reference-help" },
+        "Type this code into the editor yourself (don't copy and paste). The editor indents for you after a colon; ",
+        "press Backspace to go back one level. Then click Test, and Submit when the tests pass."),
+      h("pre", { class: "reference-code", id: "reference-code", oncopy: (e: Event) => e.preventDefault() }, problem.reference_solution),
+    ]
+    : [];
   const panel = h("section", { class: "problem", id: "problem" },
     h("h2", {}, problem.title),
     h("p", { class: "statement" }, problem.statement),
+    ...reference,
     h("h3", {}, "Tests"),
     h("ul", {}, ...problem.tests.map((t) => h("li", {}, h("code", {}, `${t.call} == ${t.expected}`)))),
   );

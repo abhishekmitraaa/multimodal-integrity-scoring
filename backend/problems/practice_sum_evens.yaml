@@ -7,6 +7,14 @@ statement: |
 starter: |
   def sum_evens(xs):
       pass
+# Shown to the student to type (practice only, D-035). Must pass the tests below.
+reference_solution: |
+  def sum_evens(xs):
+      total = 0
+      for x in xs:
+          if x % 2 == 0:
+              total += x
+      return total
 tests:
   - {call: "sum_evens([1, 2, 3, 4])", expected: "6"}
   - {call: "sum_evens([])", expected: "0"}

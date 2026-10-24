@@ -141,6 +141,17 @@ button:disabled {
   white-space: pre-wrap;
 }
 
+.reference-code {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--ok);
+  padding: 8px 10px;
+  font: 13px/1.45 ui-monospace, "Cascadia Code", Consolas, monospace;
+  overflow-x: auto;
+  user-select: none;        /* typed, not copied (D-035) */
+  -webkit-user-select: none;
+}
+
 .work {
   display: flex;
   flex-direction: column;
