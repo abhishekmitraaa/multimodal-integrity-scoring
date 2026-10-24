@@ -10,7 +10,7 @@ dropped and counted, so the EER is "on available comparisons" (D-031).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Generic, Protocol, Sequence, TypeVar
+from typing import Any, Generic, Literal, Protocol, Sequence, TypeVar
 
 import numpy as np
 
@@ -65,6 +65,32 @@ class SeqStatScorer:
 
 
 @dataclass(frozen=True)
+class EmbeddingScorer:
+    """For subjects given as embeddings (one vector per sequence).
+
+    eq5: mean Euclidean distance to each gallery embedding (TypeNet Eq. 5; primary, D-031).
+    prototype: distance to the mean gallery embedding (SPEC 7.3; ablation).
+    """
+
+    rule: Literal["eq5", "prototype"]
+
+    @property
+    def name(self) -> str:
+        return "encoder, Eq. 5" if self.rule == "eq5" else "encoder, prototype"
+
+    def prepare(self, seq: Any) -> np.ndarray:
+        return np.asarray(seq, dtype=np.float64)
+
+    def gallery(self, seqs: Sequence[Any], prepared: Sequence[np.ndarray]) -> np.ndarray:
+        return np.vstack(prepared)
+
+    def distance(self, gallery: np.ndarray, query: np.ndarray) -> float | None:
+        if self.rule == "eq5":
+            return float(np.linalg.norm(gallery - query, axis=1).mean())
+        return float(np.linalg.norm(gallery.mean(axis=0) - query))
+
+
+@dataclass(frozen=True)
 class AuthResult:
     scorer: str
     g: int
@@ -76,7 +102,7 @@ class AuthResult:
 
 
 def run_authentication(
-    subjects: Sequence[Sequence[KeySeq]],
+    subjects: Sequence[Sequence[Any]],
     scorer: Scorer[Any, Any],
     g: int,
     genuine_idx: Sequence[int],

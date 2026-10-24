@@ -11,6 +11,10 @@ dependencies = ["numpy>=1.26", "scipy>=1.11", "scikit-learn>=1.4"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+# The encoder (SPEC 7.1). Install the CUDA build from PyTorch's index, e.g.
+#   pip install torch --index-url https://download.pytorch.org/whl/cu128
+# Verified: torch 2.11.0+cu128 on an RTX 3050 6 GB. Encoder tests skip without it.
+deep = ["torch>=2.4"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

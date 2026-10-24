@@ -36,3 +36,4 @@ synthetic_keystrokes:            # D3 generator for pipeline tests only; never r
   noise_flight_log_sd: 0.25         # within-user, per keystroke
   noise_hold_log_sd: 0.15
   separations: [0.0, 0.5, 1.0]      # 0 = everyone types identically (EER should be near 50%)
+  encoder_epochs: 20                # pipeline check only; the D1 run uses models.yaml max_epochs

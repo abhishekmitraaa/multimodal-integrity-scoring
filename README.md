@@ -71,6 +71,8 @@ py -3.11 -m venv .venv
 .venv/Scripts/python scripts/make_secrets.py        # keys and tokens in ~/.integrity-exam/secrets (outside the repo)
 docker compose up -d db                              # PostgreSQL 16 on 127.0.0.1:5432
 cd frontend && npm install && npx playwright install chromium firefox webkit
+# P2 encoder only: PyTorch with CUDA (about 3 GB)
+.venv/Scripts/python -m pip install torch --index-url https://download.pytorch.org/whl/cu128
 ```
 
 ## Running the app locally (development data only)
