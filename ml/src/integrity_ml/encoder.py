@@ -15,6 +15,7 @@ Loss: max(0, d(a,p)^2 - d(a,n)^2 + margin) with random triplets (TypeNet Eq. 4, 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
 import numpy as np
@@ -157,6 +158,18 @@ def seed_everything(seed: int) -> None:
     torch.backends.cudnn.benchmark = False
 
 
+def _save_checkpoint(path: Path, model: TypeNetEncoder, opt: torch.optim.Optimizer, history: list[float],
+                     rng: np.random.Generator) -> None:
+    state = {
+        "model": model.state_dict(), "opt": opt.state_dict(), "history": history,
+        "numpy_rng": rng.bit_generator.state, "torch_rng": torch.get_rng_state(),
+        "cuda_rng": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else [],
+    }
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    torch.save(state, tmp)
+    tmp.replace(path)   # atomic: a crash mid-write never leaves a broken checkpoint
+
+
 def train(
     bank: SequenceBank,
     cfg: EncoderConfig,
@@ -164,18 +177,35 @@ def train(
     device: str = "cpu",
     epochs: int | None = None,
     log: Callable[[int, float], None] | None = None,
+    checkpoint: Path | None = None,
+    checkpoint_every: int = 10,
 ) -> tuple[TypeNetEncoder, list[float]]:
-    """Fixed number of epochs of random-triplet batches; returns the final model (no selection)."""
+    """Fixed number of epochs of random-triplet batches; returns the final model (no selection).
+
+    With `checkpoint`, state (model, optimiser, loss history and every RNG) is saved every
+    `checkpoint_every` epochs and training resumes from it, so a resumed run equals an
+    uninterrupted one.
+    """
     seed_everything(seed)
     rng = np.random.default_rng(seed)
     model = TypeNetEncoder(cfg).to(device)
     opt = torch.optim.Adam(model.parameters(), lr=cfg.learning_rate, betas=cfg.adam_betas, eps=cfg.adam_eps)
-    # The bank may be float16 (D1: about 0.7 GB for 68,000 x 15 x 70 x 5); batches are cast to float32.
-    x = torch.from_numpy(np.ascontiguousarray(bank.x)).to(device)
-    lengths = torch.from_numpy(np.ascontiguousarray(bank.lengths)).to(device)
-    index = TripletIndex.build(bank)
     history: list[float] = []
-    for epoch in range(epochs if epochs is not None else cfg.max_epochs):
+    if checkpoint is not None and checkpoint.exists():
+        state = torch.load(checkpoint, map_location=device, weights_only=False)   # our own file: includes RNG state
+        model.load_state_dict(state["model"])
+        opt.load_state_dict(state["opt"])
+        history = list(state["history"])
+        rng.bit_generator.state = state["numpy_rng"]
+        torch.set_rng_state(state["torch_rng"])
+        if state["cuda_rng"] and torch.cuda.is_available():
+            torch.cuda.set_rng_state_all(state["cuda_rng"])
+    # The bank may be float16 (D1: about 0.7 GB for 68,000 x 15 x 70 x 5); batches are cast to float32.
+    x = torch.from_numpy(np.array(bank.x, copy=True)).to(device)
+    lengths = torch.from_numpy(np.array(bank.lengths, copy=True)).to(device)
+    index = TripletIndex.build(bank)
+    total_epochs = epochs if epochs is not None else cfg.max_epochs
+    for epoch in range(len(history), total_epochs):
         model.train()
         total = 0.0
         for _ in range(cfg.batches_per_epoch):
@@ -191,6 +221,8 @@ def train(
         history.append(total / cfg.batches_per_epoch)
         if log:
             log(epoch, history[-1])
+        if checkpoint is not None and ((epoch + 1) % checkpoint_every == 0 or epoch + 1 == total_epochs):
+            _save_checkpoint(checkpoint, model, opt, history, rng)
     return model, history
 
 

@@ -127,6 +127,7 @@ def _train(d: D1, m: int, lr: float, epochs: int | None, seed: int, path: Path) 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     t = time.time()
     model, history = train(d.bank(d.fit, m), cfg, seed=seed, device=device, epochs=epochs,
+                           checkpoint=path.with_suffix(".ckpt"),
                            log=lambda e, loss: print(f"    m={m} lr={lr} epoch {e + 1}: loss {loss:.4f}", flush=True) if (e + 1) % 10 == 0 else None)
     torch.save(model.state_dict(), path)
     path.with_suffix(".json").write_text(json.dumps({"m": m, "lr": lr, "epochs": len(history), "loss": history,

@@ -84,3 +84,14 @@ def test_short_training_run_is_finite_reproducible_and_learns() -> None:
     assert np.mean(history[-2:]) < np.mean(history[:2])       # loss goes down
     emb = embed(model, bank.x, bank.lengths)
     assert emb.shape == (len(bank.x), 128) and np.all(np.isfinite(emb))
+
+
+def test_resumed_training_equals_uninterrupted(tmp_path: Path) -> None:
+    bank = _bank()
+    cfg = EncoderConfig.from_config(ENC, batch_size=16, batches_per_epoch=5)
+    _, straight = train(bank, cfg, seed=3, epochs=4)
+    ckpt = tmp_path / "run.ckpt"
+    train(bank, cfg, seed=3, epochs=2, checkpoint=ckpt, checkpoint_every=1)      # "crash" after epoch 2
+    model, resumed = train(bank, cfg, seed=3, epochs=4, checkpoint=ckpt, checkpoint_every=1)
+    assert resumed == pytest.approx(straight, rel=1e-5)
+    assert len(resumed) == 4 and ckpt.exists()
