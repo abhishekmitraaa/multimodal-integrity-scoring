@@ -37,6 +37,7 @@ the bottom. See [SPEC.md](SPEC.md) for context.
 | D-029 | The P2 TypeNet reproduction follows the protocol checked against arXiv:2101.05570v3 (Eq. 5 scoring, per-subject EER, k = 1,000, the paper's G grid) with the deviations listed in p2_protocol.md §9. `learning_rate` corrected from 0.005 to 0.05. | proposed | p2_protocol.md |
 | D-030 | The real-keyboard check page (`#/keycheck`) records locally and saves a file labelled `dataset: development`, `not_for_study: true`. It never talks to the server. Files live only under the data root, and the report refuses anything else. Team members only. | proposed | keycheck.md |
 | D-031 | P2 modelling choices (p2_protocol.md §12): both non-deep baselines (SPEC §7.2 digraph, with availability, plus a sequence-statistics scaled Manhattan); Eq. 5 scoring primary, prototype as ablation; no recurrent dropout in the first run; TypeNet Benchmark recommended, but its licence is the lead's action. | accepted (lead delegated the decision) | p2_protocol.md §12, SPEC 7.2–7.3 |
+| D-032 | Deviation 6 amended: the encoder learning rate is chosen from {0.05 (paper), 0.01, 0.005} by per-subject EER on 1,000 validation subjects held out from the 68,000 D1 training subjects, before any test access. Reason: on synthetic data, 0.05 barely trains (EER 34.6% vs 5.6% with 0.005 at separation 1.0). | accepted (lead delegated the decision) | p2_protocol.md §9, §10 |
 
 ## Open
 

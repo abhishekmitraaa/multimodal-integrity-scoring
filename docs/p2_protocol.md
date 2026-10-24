@@ -1,6 +1,6 @@
 # P2 protocol: TypeNet reproduction and the non-deep baseline
 
-Version 0.2, 2026-10-24. Status: **decisions in §12 taken (delegated by the lead). Nothing has been
+Version 0.3, 2026-10-24 (deviation 6 amended after the synthetic encoder check). Status: **decisions in §12 taken (delegated by the lead). Nothing has been
 trained on real keystroke data; D1 is not yet available.** SPEC §12.7 requires this document before any P2 training.
 
 ## Sources checked
@@ -187,7 +187,7 @@ Outside the band, we write a gap analysis instead of tuning towards the number.
 | 3 | **No recurrent dropout** in the first run | PyTorch's `nn.LSTM` has none, and a custom cell loses the fast cuDNN kernel | Slightly more overfitting, so perhaps a slightly higher EER. If we land outside the band, we add a custom LSTM cell with recurrent dropout 0.2 and rerun (decision 3, §12). |
 | 4 | Packed sequences; batch-norm statistics over real keystrokes only | Whether padded zeros entered Keras's batch-norm statistics depends on the Keras version, which isn't stated | Small; it matters only for short sentences |
 | 5 | Final hidden state taken at the last real keystroke | This is what a Keras masked LSTM returns | None |
-| 6 | Learning rate 0.05 as printed; fallback sweep {0.05, 0.01, 0.005} on training-subject validation users if training diverges | 0.05 is high for Adam on an LSTM | None if it trains. A fallback is logged as a deviation. |
+| 6 | **Amended 2026-10-24.** The learning rate is chosen from {0.05, 0.01, 0.005} (0.05 = the paper's value, tried first) by per-subject EER on 1,000 **validation subjects held out from the 68,000 training subjects**. The choice is made before any access to the test pool and logged. | On SYNTHETIC data (§10), 0.05 barely trains in our PyTorch setup: at separation 1.0, loss 0.69 → 0.54 and EER 34.6%, against 0.40 → 0.11 and 5.6% with 0.005. The original trigger ("if training diverges") missed this, because the loss falls slowly rather than diverging. | If a lower rate is chosen, it is a deviation from the paper, reported with both validation EERs. Possible reasons (unverified): a typo in the paper, or Keras/PyTorch differences. |
 | 7 | Triplet sampling details | Not stated (§4.4) | Unknown, probably small |
 | 8 | "First 68,000" and "first 1,000" by our participant-ID order | The authors' order isn't stated | Different test subjects. We report the spread over 5 random draws of 1,000. |
 | 9 | Triplet loss only | SPEC §7.1 | None on the triplet column |
@@ -232,6 +232,13 @@ results):
   `ml/src/integrity_ml/{eer,baselines,synthetic_keystrokes}.py` and
   `eval/src/integrity_eval/{authentication,p2_synthetic}.py`. The EER sweep matches a
   transcription of the authors' `eer_compute` to 1e-9 on random score sets.
+- **Encoder on synthetic data (2026-10-24).** The encoder trains end to end on the GPU (RTX 3050).
+  With the paper's learning rate it barely learns (above); with 0.005 it separates synthetic
+  subjects well (EER 5.6% at separation 1.0, 0.8% at 2.0; G = 5; 200 training and 100 test
+  subjects; 10 epochs). This rules out a gross bug and led to the amendment of deviation 6.
+  The synthetic generator encodes identity exactly in per-digraph timing, which the digraph
+  baseline measures directly. So the baseline "winning" on synthetic data says nothing about
+  real typing.
 
 ## 11. Test access and data handling for D1
 

@@ -54,7 +54,7 @@ The full design is in [docs/SPEC.md](docs/SPEC.md) and decisions are logged in
 |---|---|---|
 | P0 | Repo skeleton and spec | approved with changes |
 | P1 | Capture app, server log, replay | approved ([report](docs/phase-reports/P1.md)) |
-| P2 | Keystroke features and baseline model on public data | protocol written, awaiting review ([p2_protocol.md](docs/p2_protocol.md)); real-keyboard check ready ([keycheck.md](docs/keycheck.md)); Aalto licence requested; no training yet |
+| P2 | Keystroke features and baseline model on public data | in progress ([progress report](docs/phase-reports/P2-progress.md)): protocol, baselines, encoder, EER and protocol runner built and tested on synthetic data; Aalto reproduction blocked on the licence |
 | P3 | Enrollment, process/AST/clipboard features, fusion, thresholds | not started |
 | P4 | Reviewer dashboard | not started |
 | P5 | Data collection tooling, evaluation harness, attack report | not started; ethics checklist first |

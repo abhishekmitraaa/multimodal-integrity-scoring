@@ -32,6 +32,8 @@ reproduction:                    # P2 TypeNet reproduction on D1 (docs/p2_protoc
   eer: per_subject_mean          # TypeNet §5.1
   eer_threshold_steps: 10000     # authors' README code
   random_test_draws: 5           # spread over random choices of the k test subjects
+  learning_rate_candidates: [0.05, 0.01, 0.005]   # deviation 6 (amended): chosen on held-out TRAINING subjects
+  validation_subjects: 1000      # taken from the 68,000 training subjects; never the test pool
 digraph_baseline:
   min_occurrences: 3
   min_shared_items: 5
