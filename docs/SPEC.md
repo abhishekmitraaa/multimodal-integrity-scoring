@@ -273,8 +273,11 @@ Field notes:
   JavaScript by an unmodified page. **It is not a defence.** It does not catch OS-level injection
   (AutoHotkey, xdotool, USB injectors) or CDP-driven input. The browser owner can also make it
   report anything. **Measured in P1:** Playwright-driven keystrokes report `isTrusted = true` in
-  Chromium, Firefox and WebKit, so browser-automation auto-typers (A2/A3) look trusted. OS-level
-  injection on Windows was not measured. It is logged as weak evidence only.
+  Chromium, Firefox and WebKit, so browser-automation auto-typers (A2/A3) look trusted.
+  **Measured in P2 (2026-10-24, synthetic):** Windows `SendInput` keystrokes, the AutoHotkey path,
+  report `isTrusted = true` in Chrome 155, Edge 155 and Firefox 155, with correct `code` values
+  (`eval/tools/os_inject/`). OS-level auto-typers are indistinguishable by this flag. It is logged
+  as weak evidence only.
 - **Lengths and offsets** are in **UTF-16 code units**, as Monaco reports them. The server's replay
   is UTF-16-aware and is tested with non-BMP characters.
 - **Lines and columns** are 1-based, as in Monaco.
@@ -443,11 +446,11 @@ The results are in [phase-reports/P1.md](phase-reports/P1.md). Summary:
 
 | # | Question | Result |
 |---|---|---|
-| 1 | Timer resolution | 100 µs (Chromium) or 1 ms (Firefox, WebKit) without COOP/COEP; 5–20 µs with it. `timeStamp` semantics with **real** keyboards are not yet measured: Playwright input is synthetic. The real-keyboard check ([keycheck.md](keycheck.md)) measures them. |
+| 1 | Timer resolution | 100 µs (Chromium) or 1 ms (Firefox, WebKit) without COOP/COEP; 5–20 µs with it. **`timeStamp` is the input time, not the dispatch time**, in Chrome, Edge and Firefox on Windows, measured with OS-injected (`SendInput`) keys in P2: 33–39% of keys typed during deliberate 80 ms page stalls were stamped inside the stall. Handler lag after the key event: median under 1 ms (Chrome, Edge), about 8 ms (Firefox). Real-keyboard hardware behaviour (overlaps, auto-repeat) still needs the human check ([keycheck.md](keycheck.md)). |
 | 2 | Monaco options take effect | Yes (§4.8) |
 | 3 | Event order | keydown → content_change → keyup; `paste` after its change |
 | 4 | Multi-change order | end of document to start |
-| 5 | `isTrusted` | Playwright input is `true` everywhere. OS-level auto-typer not measured. |
+| 5 | `isTrusted` | Playwright input is `true` everywhere. OS-level `SendInput` input is `true` in Chrome, Edge and Firefox on Windows (P2). Injected held keys produce **no auto-repeat**; only physical keys repeat. |
 | 6 | Keyboard Map API | Chromium only |
 | 7 | Beacon on reload | unload batch delivered in Chromium, Firefox and WebKit |
 

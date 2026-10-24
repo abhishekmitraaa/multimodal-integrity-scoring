@@ -235,6 +235,12 @@ def jank_stats(run: dict[str, Any], cfg: dict[str, Any]) -> JankStats:
     return JankStats(len(keydowns), frac, lag, verdict)
 
 
+def _trusted_share(run: dict[str, Any]) -> str:
+    """Share of events with isTrusted = true. Not a defence (SPEC 4.5): OS-level injection is trusted too."""
+    events = run["events"]
+    return f"{sum(bool(e['trusted']) for e in events) / len(events):.0%}" if events else "–"
+
+
 def _fmt(value: float | None, digits: int = 1) -> str:
     return "–" if value is None else f"{value:.{digits}f}"
 
@@ -262,8 +268,8 @@ def render(runs: Sequence[dict[str, Any]], cfg: dict[str, Any]) -> str:
         "",
         "## Runs",
         "",
-        "| # | Tester | Keyboard | OS | Browser | Isolated | Timer step (µs) | timeStamp grid (µs) | File |",
-        "|---|---|---|---|---|---|---|---|---|",
+        "| # | Tester | Keyboard | OS | Browser | Isolated | Timer step (µs) | timeStamp grid (µs) | isTrusted | File |",
+        "|---|---|---|---|---|---|---|---|---|---|",
     ]
     for i, run in enumerate(runs, 1):
         grid = timestamp_grid_us([e["ts"] for e in run["events"]]) if run["events"] else 0
@@ -271,7 +277,7 @@ def render(runs: Sequence[dict[str, Any]], cfg: dict[str, Any]) -> str:
         lines.append(
             f"| {i} | {run['tester']} | {keyboard} | {run['os']} | {run['browser']['brand']} {run['browser']['version']} | "
             f"{'yes' if run['cross_origin_isolated'] else 'no'} | {run['timer_resolution_us']} | "
-            f"{grid if grid else 'finer than 1'} | `{run['_file']}` |"
+            f"{grid if grid else 'finer than 1'} | {_trusted_share(run)} | `{run['_file']}` |"
         )
     lines += [
         "",

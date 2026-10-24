@@ -41,7 +41,7 @@ the bottom. See [SPEC.md](SPEC.md) for context.
 
 ## Open
 
-- **First secrets backup** (D-028): the lead runs `scripts/backup_secrets.py backup` onto an offline drive.
+- **Offline secrets backup** (D-028): a verified encrypted backup exists on `D:` (same SSD, made 2026-10-24). The lead still needs an offline USB copy, ideally made fresh with a passphrase only the lead knows.
 - **TypeNet Benchmark licence** (optional, D-031): only the lead can sign BiDA Lab's agreement.
 - **Q4: data governance** (retention N, identity-map custodian, named responsible party, reviewers
   outside the team). Sent to the faculty guide as the governance one-pager

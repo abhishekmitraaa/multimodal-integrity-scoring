@@ -32,6 +32,18 @@ real keyboards to answer three questions:
   password managers that watch fields), or write the extension in the keyboard description. Such
   extensions can add key-handling work to the page.
 
+## Already answered without a keyboard (2026-10-24)
+
+OS-level injected keystrokes (Windows `SendInput`, synthetic; `eval/tools/os_inject/`) answered
+two of the questions for Chrome, Edge and Firefox on Windows:
+
+- `timeStamp` is the **input time**: keys typed during a page stall are stamped inside it.
+- `isTrusted` is `true` for OS-injected keys.
+
+They cannot answer what depends on keyboard hardware and real hands: overlaps, auto-repeat timing,
+and differences between laptop and external keyboards. Those still need this check. Injected
+holds don't auto-repeat at all.
+
 ## How to run it
 
 The page runs entirely in the browser. It doesn't need the backend or the database.

@@ -1,8 +1,8 @@
 # Phase 2 progress report: keystroke features and baseline model
 
 Date: 2026-10-24. Status: **in progress. Everything that does not need the Aalto data is built
-and tested. The TypeNet reproduction waits for the dataset licence.** Branch
-`p2/protocol-and-keycheck`; `main` is unchanged since P1.
+and tested. The TypeNet reproduction waits for the dataset licence.** Merged into
+`main` on 2026-10-24 (the lead delegated the merge).
 
 **No result in this report comes from real keystroke data.** Every number below is from labelled
 SYNTHETIC data (D3). It shows that the code works and responds as intended, and nothing about
@@ -15,8 +15,9 @@ that anything detects anything.
 |---|---|---|
 | TypeNet protocol, checked against arXiv:2101.05570v3 and the authors' README | [p2_protocol.md](../p2_protocol.md) v0.3 | done; decisions taken (D-031); deviation 6 amended |
 | P1 review decisions: isolation by default, Chromium + Firefox, threat model, find/replace | SPEC v0.3, D-021…D-027 | done |
-| Real-keyboard check page and report | [keycheck.md](../keycheck.md), `#/keycheck` | ready; **not yet run by the team** |
-| Secrets moved out of the repo, guarded, encrypted backup script | SPEC 10.6, D-028 | done; **first offline backup not yet made** |
+| Real-keyboard check page and report | [keycheck.md](../keycheck.md), `#/keycheck` | ready; **real-keyboard runs still need the team**. OS-level injected runs done (below). |
+| OS-level injection check (first piece of the A2 harness) | `eval/tools/os_inject/` | done in Chrome, Edge and Firefox (synthetic) |
+| Secrets moved out of the repo, guarded, encrypted backup script | SPEC 10.6, D-028 | done; first backup made on `D:` (same SSD); **an offline USB copy is still needed** |
 | Keystroke pairing and latencies (SPEC 6.1) | `ml/src/integrity_ml/keystroke.py` | done |
 | EER: the authors' sweep (matches their code to 1e-9) and exact global EER | `ml/src/integrity_ml/eer.py` | done |
 | Non-deep baselines: SPEC 7.2 digraph and sequence-statistics scaled Manhattan | `ml/src/integrity_ml/baselines.py` | done |
@@ -57,6 +58,23 @@ the encoder works, but the paper's printed rate barely trains in our setup. The 
 chooses the rate on held-out *training* subjects before any test access (deviation 6, amended;
 D-032).
 
+## OS-level injection check (SYNTHETIC input, Windows 11, 2026-10-24)
+
+A constant-rate typer (150 ms press-to-press, 80 ms hold) typed through Windows `SendInput` into
+the keycheck page in real, headed Chrome 155, Edge 155 and Firefox 155 (Playwright's build).
+The page was cross-origin isolated, giving a timer step of 5 µs (Chromium) and 20 µs (Firefox).
+
+| Question | Answer |
+|---|---|
+| Does `isTrusted` flag an OS-level auto-typer? | **No.** 100% of events were trusted in all three browsers. |
+| Is `timeStamp` the input time or the dispatch time? | **Input time** in all three: 33–39% of keys typed during 80 ms page stalls were stamped inside the stall. |
+| How long until our handler runs? | Median under 1 ms in Chrome and Edge, about 8 ms in Firefox |
+| Do injected held keys auto-repeat? | **No.** A 1.5 s injected hold gave 0 repeats; the OS repeats only physical keys. |
+| Timing of the injected typer | press-to-press 149.7 ± 8.2 ms (coefficient of variation 0.055) in Edge: PowerShell scheduling jitter on top of a constant plan |
+
+Report: `%INTEGRITY_DATA_ROOT%\dev\keycheck-os-injected_report.md`, from four files (Edge was run
+twice). The data stays in the data root.
+
 ## What works
 
 - Every P2 component that does not need D1 runs end to end, from keystrokes to EER, on the
@@ -76,9 +94,12 @@ D-032).
 3. **The synthetic generator is simple.** It stores identity exactly where the digraph baseline
    looks, so the baseline-versus-encoder ranking on synthetic data means nothing.
 4. **Aalto format, subject count and "one sitting" are unverified** (p2_protocol §0.1, §1).
-5. **The real-keyboard check has not been run** with real keyboards.
-6. **The first secrets backup doesn't exist yet.** Until the lead runs it, losing the laptop
-   loses the dev data.
+5. **The real-keyboard check has not been run with real keyboards.** OS-injected input answered
+   the clock and `isTrusted` questions on Windows, but overlaps, auto-repeat and keyboard
+   differences need real hands.
+6. **The secrets backup is on the same SSD** (`D:` is a partition of disk 0). It protects against
+   deleting the folder, not against a dead drive or a lost laptop. An offline USB copy is still
+   needed, and its passphrase was shown in the chat transcript.
 7. ruff and mypy are still not installed, so they were not run.
 
 ## What the lead should do or decide next
@@ -91,4 +112,3 @@ D-032).
 3. **Run the real-keyboard check** with Sneha and Mehul ([keycheck.md](../keycheck.md)), about 5
    minutes per run.
 4. **Optional:** sign BiDA Lab's TypeNet Benchmark licence (D-031).
-5. **Merge the branch into `main`** when you have reviewed it.

@@ -151,6 +151,7 @@ def test_render_and_cli(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> N
     report = render([make_run(events)], CFG)
     assert "DEVELOPMENT DATA" in report and "SYNTHETIC" in report
     assert "not enough key presses in task 4" in report
+    assert "| 100% |" in report   # isTrusted share
     _write(tmp_path, "run.dev.json", make_run(events))
     assert main([str(tmp_path)]) == 0
     assert "# Real-keyboard check report" in capsys.readouterr().out
