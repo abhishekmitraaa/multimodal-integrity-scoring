@@ -45,6 +45,7 @@ seqstat_baseline:                # always-available non-deep baseline (D-031, p2
 enrollment:
   g_values: [1, 3, 5, 10]        # [BRIEF]
   g_min: 5
+  scoring: prototype             # D-033: online and primary on our data; Eq. 5 (mean_distance_to_gallery) is the ablation
 fusion:
   model: logistic_regression     # [BRIEF] MLP only if ablation shows gain
   penalty: l2
