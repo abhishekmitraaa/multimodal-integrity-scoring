@@ -205,11 +205,16 @@ plus the median HL per key. The distance to a query is the mean absolute differe
 items (Manhattan, divided by the number of shared items). The baseline is unavailable if fewer than
 5 items are shared.
 
-**Expected problem (arithmetic, not yet measured).** One sentence has about 70 keystrokes, so about
-69 digraphs, most of them unique. With G = 1 or 2, few digraphs reach 3 occurrences. The baseline
-as specified will therefore be **unavailable for many comparisons at small G**. The paper saw a
-similar failure: its digraph/SVM comparison at G = 5, M = 50 was "near chance accuracy" (§6.1). See
-decision 1 (§12) for how this is handled.
+**Sparsity at small G (corrected 2026-10-24).** One sentence has about 70 keystrokes, so about 69
+digraphs, most of them unique. With G = 1 or 2, few digraphs reach 3 occurrences. v0.1 of this
+document predicted the baseline would therefore be unavailable for many comparisons. That was
+wrong for the baseline as specified: SPEC §7.2 also counts per-key hold times. Common keys (space,
+e, t) easily occur 3 times in 70 keystrokes, so 5 shared items are usually reached. In the
+synthetic pipeline check availability was 100% at every G. The real consequence is different: **at
+small G the baseline is mostly a hold-time comparison**, with few digraphs. The availability rate is
+still reported, and on D1 the share of digraph items versus key items will be reported too. The
+paper's own digraph comparison (digraph/SVM, a different method) was "near chance accuracy" at
+G = 5, M = 50 (§6.1).
 
 **Pipeline check on labelled synthetic data (D3).** Before any real data, the baseline and the
 EER code run on generated users (filenames and figures marked SYNTHETIC; never reported as
@@ -220,6 +225,13 @@ results):
 - Expected outcomes, checked by tests: users with widely separated parameters give an EER near 0;
   identical users give an EER near 50%; lowering the separation raises the EER step by step.
 - These checks only show the code works. They show nothing about keystroke identity.
+- **Status (2026-10-24): implemented and run.** `python -m integrity_eval.p2_synthetic` runs both
+  baselines under the exact TypeNet indices on 100 synthetic subjects per separation level. As
+  intended, identical subjects give an EER of about 50%, the EER falls as separation grows, more
+  gallery sentences help, and the per-subject EER is below the global-threshold EER. Code:
+  `ml/src/integrity_ml/{eer,baselines,synthetic_keystrokes}.py` and
+  `eval/src/integrity_eval/{authentication,p2_synthetic}.py`. The EER sweep matches a
+  transcription of the authors' `eer_compute` to 1e-9 on random score sets.
 
 ## 11. Test access and data handling for D1
 
