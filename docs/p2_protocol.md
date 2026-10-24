@@ -276,8 +276,9 @@ results):
    always-available scaled-Manhattan baseline on per-sequence timing statistics (mean and SD of
    HL, PL, IL and RL), scaled by the spread over training subjects. Both score a query against the
    pooled gallery, because a single 70-keystroke sentence is too sparse for a digraph profile.
-2. **Scoring rule: Eq. 5 primary.** Eq. 5 for the reproduction. On our data both rules are
-   pre-registered, with Eq. 5 primary and the prototype rule (SPEC §7.3) as an ablation.
+2. **Scoring rule: Eq. 5 for the reproduction.** On our data the primary rule is now the prototype
+   (D-033, 2026-10-24, after P2): it matched Eq. 5 on D1 and is cheaper online. Eq. 5 is the
+   ablation on D2.
 3. **Recurrent dropout: omitted** in the first PyTorch run. It is added (custom cell) only if an
    acceptance cell falls outside its band.
 4. **TypeNet Benchmark: recommended, not requested.** It needs the lead's signature on BiDA Lab's

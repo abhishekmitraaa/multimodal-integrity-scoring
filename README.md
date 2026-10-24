@@ -54,7 +54,7 @@ The full design is in [docs/SPEC.md](docs/SPEC.md) and decisions are logged in
 |---|---|---|
 | P0 | Repo skeleton and spec | approved with changes |
 | P1 | Capture app, server log, replay | approved ([report](docs/phase-reports/P1.md)) |
-| P2 | Keystroke features and baseline model on public data | done, awaiting approval ([report](docs/phase-reports/P2.md)): TypeNet reproduced within every acceptance band on the Aalto data; baselines 20–26% EER; human real-keyboard check still open |
+| P2 | Keystroke features and baseline model on public data | **approved** ([report](docs/phase-reports/P2.md)): TypeNet reproduced within every acceptance band on the Aalto data; human real-keyboard check still open |
 | P3 | Enrollment, process/AST/clipboard features, fusion, thresholds | not started |
 | P4 | Reviewer dashboard | not started |
 | P5 | Data collection tooling, evaluation harness, attack report | not started; ethics checklist first |

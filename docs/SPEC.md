@@ -1,7 +1,7 @@
 # SPEC: Personalized Multi-Modal Integrity Scoring for Live Coding Exams
 
-Version 0.3, 2026-09-26. Course: BITE308L, VIT. Status: **P0 and P1 approved; P2 complete except
-the human real-keyboard check, awaiting approval** ([P2 report](phase-reports/P2.md)). Q4 is with the faculty guide.
+Version 0.3, 2026-09-26. Course: BITE308L, VIT. Status: **P0, P1 and P2 approved** ([P2 report](phase-reports/P2.md)); the
+human real-keyboard check is still open. P3 not started. Q4 is with the faculty guide.
 Repository: `C:\dev\integrity-exam`, outside any cloud-synced folder. Python is pinned to 3.11.
 
 Markers used in this document:
@@ -611,10 +611,15 @@ are shared, the baseline is unavailable.
 - **Prototype.** $c_u = \frac{1}{G}\sum_{g=1}^{G} f(w_g)$, the mean embedding over $G$ enrollment
   windows from the practice modules.
 - **Distance.** $d_{ks}(w) = \lVert f(w) - c_u \rVert_2$.
-- **[DECIDED D-031]** TypeNet scores differently: it averages the distances to each enrollment
-  embedding, $\frac{1}{G}\sum_g \lVert f(w) - f(w_g) \rVert$ (Eq. 5). The P2 reproduction uses
-  Eq. 5. On our data both rules are pre-registered: Eq. 5 is primary and the prototype distance
-  above is the ablation.
+- **[DECIDED D-033, replaces the D-031 choice]** The prototype distance above is the rule for our
+  system: online scoring and the primary analysis of our data (D2). TypeNet's rule, the mean
+  distance to each enrollment embedding $\frac{1}{G}\sum_g \lVert f(w) - f(w_g) \rVert$ (Eq. 5), is
+  the pre-registered ablation on D2. The P2 reproduction used Eq. 5, as the paper does.
+  - Evidence (D1, P2): the two rules agree within 0.05 points of per-subject EER at every cell.
+    The prototype's global-threshold EER is equal or slightly lower (for example 3.24% against
+    3.42% at M = 70, G = 10). It costs one distance per tick instead of G. What is deployed is
+    what is evaluated.
+  - The switch was made before any D2 data exists, so no test result of ours informed it.
 - **Report.** EER against $G \in \{1, 3, 5, 10\}$ for both the encoder and the digraph baseline.
 - **Minimum.** The keystroke modality is unavailable for a participant with fewer than
   `models.enrollment.g_min` (5) valid enrollment windows.
