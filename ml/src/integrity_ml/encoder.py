@@ -107,18 +107,42 @@ class SequenceBank:
                    np.array([r[2] for r in rows], dtype=np.int64))
 
 
-def sample_triplets(bank: SequenceBank, batch: int, rng: np.random.Generator) -> tuple[NDArray[np.int64], ...]:
+@dataclass(frozen=True)
+class TripletIndex:
+    """Sequences grouped by subject once, so sampling a batch is vectorised (68,000 subjects)."""
+
+    order: NDArray[np.int64]     # sequence indices sorted by subject
+    start: NDArray[np.int64]     # first position in `order` for each eligible subject
+    count: NDArray[np.int64]     # sequences per eligible subject (>= 2)
+    subject: NDArray[np.int64]   # subject of every sequence
+
+    @classmethod
+    def build(cls, bank: SequenceBank) -> TripletIndex:
+        order = np.argsort(bank.subject, kind="stable")
+        subjects, start, count = np.unique(bank.subject[order], return_index=True, return_counts=True)
+        keep = count >= 2
+        if not keep.any():
+            raise ValueError("no subject has two sequences")
+        if len(subjects) < 2:
+            raise ValueError("triplets need at least two subjects")
+        return cls(order, start[keep], count[keep], bank.subject)
+
+
+def sample_triplets(bank: SequenceBank, batch: int, rng: np.random.Generator,
+                    index: TripletIndex | None = None) -> tuple[NDArray[np.int64], ...]:
     """Random triplets (TypeNet §4.4): anchor and positive are two different sequences of one
     subject; the negative is a random sequence of another subject."""
-    by_subject = [np.flatnonzero(bank.subject == s) for s in range(int(bank.subject.max()) + 1)]
-    eligible = [s for s, idx in enumerate(by_subject) if idx.size >= 2]
-    if not eligible:
-        raise ValueError("no subject has two sequences")
-    subj = rng.choice(eligible, size=batch)
-    anchors, positives, negatives = (np.empty(batch, dtype=np.int64) for _ in range(3))
-    for i, s in enumerate(subj):
-        anchors[i], positives[i] = rng.choice(by_subject[s], size=2, replace=False)
-        negatives[i] = rng.choice(np.flatnonzero(bank.subject != s))
+    ix = index or TripletIndex.build(bank)
+    pick = rng.integers(0, len(ix.start), size=batch)
+    start, count = ix.start[pick], ix.count[pick]
+    a_off = rng.integers(0, count)
+    p_off = (a_off + rng.integers(1, count)) % count            # a different sequence of the same subject
+    anchors, positives = ix.order[start + a_off], ix.order[start + p_off]
+    negatives = rng.integers(0, len(ix.subject), size=batch)
+    clash = ix.subject[negatives] == ix.subject[anchors]
+    while clash.any():                                          # redraw the rare same-subject negatives
+        negatives[clash] = rng.integers(0, len(ix.subject), size=int(clash.sum()))
+        clash = ix.subject[negatives] == ix.subject[anchors]
     return anchors, positives, negatives
 
 
@@ -146,16 +170,18 @@ def train(
     rng = np.random.default_rng(seed)
     model = TypeNetEncoder(cfg).to(device)
     opt = torch.optim.Adam(model.parameters(), lr=cfg.learning_rate, betas=cfg.adam_betas, eps=cfg.adam_eps)
-    x = torch.from_numpy(bank.x).to(device)
-    lengths = torch.from_numpy(bank.lengths).to(device)
+    # The bank may be float16 (D1: about 0.7 GB for 68,000 x 15 x 70 x 5); batches are cast to float32.
+    x = torch.from_numpy(np.ascontiguousarray(bank.x)).to(device)
+    lengths = torch.from_numpy(np.ascontiguousarray(bank.lengths)).to(device)
+    index = TripletIndex.build(bank)
     history: list[float] = []
     for epoch in range(epochs if epochs is not None else cfg.max_epochs):
         model.train()
         total = 0.0
         for _ in range(cfg.batches_per_epoch):
-            a, p, n = (torch.from_numpy(idx).to(device) for idx in sample_triplets(bank, cfg.batch_size, rng))
+            a, p, n = (torch.from_numpy(idx).to(device) for idx in sample_triplets(bank, cfg.batch_size, rng, index))
             idx = torch.cat([a, p, n])
-            emb = model(x[idx], lengths[idx])
+            emb = model(x[idx].float(), lengths[idx])
             fa, fp, fn = emb.split(cfg.batch_size)
             loss = triplet_loss(fa, fp, fn, cfg.triplet_margin)
             opt.zero_grad()
@@ -173,7 +199,7 @@ def embed(model: TypeNetEncoder, x: NDArray[np.float32], lengths: NDArray[np.int
     model.eval()
     out = []
     for i in range(0, len(x), batch):
-        xb = torch.from_numpy(x[i:i + batch]).to(device)
+        xb = torch.from_numpy(np.ascontiguousarray(x[i:i + batch])).to(device).float()
         lb = torch.from_numpy(lengths[i:i + batch]).to(device)
         out.append(model(xb, lb).cpu().numpy())
     return np.concatenate(out) if out else np.zeros((0, model.lstm2.hidden_size), dtype=np.float32)
