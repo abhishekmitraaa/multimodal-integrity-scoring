@@ -1,6 +1,7 @@
 # P2 protocol: TypeNet reproduction and the non-deep baseline
 
-Version 0.3, 2026-10-24 (deviation 6 amended after the synthetic encoder check). Status: **decisions in §12 taken (delegated by the lead). Nothing has been
+Version 0.3, 2026-10-24 (deviation 6 amended after the synthetic encoder check). **Executed: all
+acceptance cells pass; see [P2.md](phase-reports/P2.md).** Status: **decisions in §12 taken (delegated by the lead). Nothing has been
 trained on real keystroke data; D1 is not yet available.** SPEC §12.7 requires this document before any P2 training.
 
 ## Sources checked

@@ -1,7 +1,7 @@
 # SPEC: Personalized Multi-Modal Integrity Scoring for Live Coding Exams
 
-Version 0.3, 2026-09-26. Course: BITE308L, VIT. Status: **P0 and P1 approved; P2 started with
-the protocol write-up** ([p2_protocol.md](p2_protocol.md)). Q4 is with the faculty guide.
+Version 0.3, 2026-09-26. Course: BITE308L, VIT. Status: **P0 and P1 approved; P2 complete except
+the human real-keyboard check, awaiting approval** ([P2 report](phase-reports/P2.md)). Q4 is with the faculty guide.
 Repository: `C:\dev\integrity-exam`, outside any cloud-synced folder. Python is pinned to 3.11.
 
 Markers used in this document:
@@ -1114,8 +1114,9 @@ user for testing without leakage.
 - **Acceptance [DECIDED Q5].** Our EER at each $G$ is within max(1 percentage point absolute, 50%
   relative) of the published value under the same protocol, or a written gap analysis explains the
   difference.
-- **Status.** Written: [p2_protocol.md](p2_protocol.md) v0.1 (all 8 items, the deviations and the
-  acceptance bands). It awaits the lead's review. No training has started.
+- **Status (2026-10-24): passed.** All 10 Table 2 cells (M = 50 and 70, G = 1–10) are inside their
+  bands on D1, using learning rate 0.005 chosen on validation subjects (D-032). See
+  [P2.md](phase-reports/P2.md) and [P2-results.md](phase-reports/P2-results.md).
 
 ---
 
