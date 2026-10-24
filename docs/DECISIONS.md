@@ -36,12 +36,12 @@ the bottom. See [SPEC.md](SPEC.md) for context.
 | D-028 | Secrets live outside the repo and sync: `INTEGRITY_SECRETS_DIR`, default `~/.integrity-exam/secrets` (moved 2026-10-24). The backend refuses a secrets folder in the repo or a synced folder. `scripts/backup_secrets.py` makes a passphrase-encrypted backup (scrypt + AES-256-GCM) kept offline by the lead, with the passphrase in a password manager. | accepted (lead delegated the decision) | SPEC 10.6 |
 | D-029 | The P2 TypeNet reproduction follows the protocol checked against arXiv:2101.05570v3 (Eq. 5 scoring, per-subject EER, k = 1,000, the paper's G grid) with the deviations listed in p2_protocol.md §9. `learning_rate` corrected from 0.005 to 0.05. | proposed | p2_protocol.md |
 | D-030 | The real-keyboard check page (`#/keycheck`) records locally and saves a file labelled `dataset: development`, `not_for_study: true`. It never talks to the server. Files live only under the data root, and the report refuses anything else. Team members only. | proposed | keycheck.md |
+| D-031 | P2 modelling choices (p2_protocol.md §12): both non-deep baselines (SPEC §7.2 digraph, with availability, plus a sequence-statistics scaled Manhattan); Eq. 5 scoring primary, prototype as ablation; no recurrent dropout in the first run; TypeNet Benchmark recommended, but its licence is the lead's action. | accepted (lead delegated the decision) | p2_protocol.md §12, SPEC 7.2–7.3 |
 
 ## Open
 
 - **First secrets backup** (D-028): the lead runs `scripts/backup_secrets.py backup` onto an offline drive.
-- **P2 modelling questions** (baseline at small G, scoring rule, recurrent dropout, TypeNet
-  Benchmark licence). See p2_protocol.md §12.
+- **TypeNet Benchmark licence** (optional, D-031): only the lead can sign BiDA Lab's agreement.
 - **Q4: data governance** (retention N, identity-map custodian, named responsible party, reviewers
   outside the team). Sent to the faculty guide as the governance one-pager
   (https://claude.ai/code/artifact/b8f7ee47-8b1a-4f57-bd0f-11e0c36d660b). It blocks the final

@@ -608,10 +608,10 @@ are shared, the baseline is unavailable.
 - **Prototype.** $c_u = \frac{1}{G}\sum_{g=1}^{G} f(w_g)$, the mean embedding over $G$ enrollment
   windows from the practice modules.
 - **Distance.** $d_{ks}(w) = \lVert f(w) - c_u \rVert_2$.
-- **[OPEN, P2 question 2]** TypeNet scores differently: it averages the distances to each
-  enrollment embedding, $\frac{1}{G}\sum_g \lVert f(w) - f(w_g) \rVert$ (Eq. 5). The P2
-  reproduction uses Eq. 5. For our data, the proposal is to pre-register both rules, with Eq. 5
-  primary.
+- **[DECIDED D-031]** TypeNet scores differently: it averages the distances to each enrollment
+  embedding, $\frac{1}{G}\sum_g \lVert f(w) - f(w_g) \rVert$ (Eq. 5). The P2 reproduction uses
+  Eq. 5. On our data both rules are pre-registered: Eq. 5 is primary and the prototype distance
+  above is the ablation.
 - **Report.** EER against $G \in \{1, 3, 5, 10\}$ for both the encoder and the digraph baseline.
 - **Minimum.** The keystroke modality is unavailable for a participant with fewer than
   `models.enrollment.g_min` (5) valid enrollment windows.
@@ -1157,7 +1157,7 @@ See [DECISIONS.md](DECISIONS.md) for the full log.
 | Q5: evaluation | **Decided with changes.** Nested user-level CV; cluster bootstrap over users; exact TypeNet protocol documented before P2 training (§12.7). |
 | P1 review | **Decided.** COOP/COEP by default, the same for all sessions, no accuracy claim (D-021). Chromium and Firefox only, same browser both sittings (D-025). Threat-model additions and mandatory P3 reconciliation (D-026). Replace disabled, `unknown` is a flag (D-027). Aalto licence requested by the lead. |
 | Field-key location and backup | **Decided (D-028).** Moved out of the repo; guarded; encrypted offline backup script (§10.6). The lead makes the first backup. |
-| P2 modelling questions | **Open.** Four questions in [p2_protocol.md](p2_protocol.md) §12. |
+| P2 modelling questions | **Decided (D-031).** [p2_protocol.md](p2_protocol.md) §12. |
 
 ---
 

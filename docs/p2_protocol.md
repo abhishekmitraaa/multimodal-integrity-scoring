@@ -1,7 +1,7 @@
 # P2 protocol: TypeNet reproduction and the non-deep baseline
 
-Version 0.1, 2026-09-26. Status: **draft for the lead's review. Nothing has been trained or run on
-keystroke data.** SPEC §12.7 requires this document before any P2 training.
+Version 0.2, 2026-10-24. Status: **decisions in §12 taken (delegated by the lead). Nothing has been
+trained on real keystroke data; D1 is not yet available.** SPEC §12.7 requires this document before any P2 training.
 
 ## Sources checked
 
@@ -137,7 +137,7 @@ The two parametrisations are equivalent. The encoder's unit test will check the 
 
 | Item | Quote | Our choice |
 |---|---|---|
-| Score | §5.1, Eq. 5: s = (1/G) Σ_g ‖f(x_gallery,g) − f(x_query)‖. The **mean of the distances** to each gallery embedding. | Eq. 5 for the reproduction. **This differs from SPEC §7.3**, which uses the distance to the mean embedding (a prototype). See question 2. |
+| Score | §5.1, Eq. 5: s = (1/G) Σ_g ‖f(x_gallery,g) − f(x_query)‖. The **mean of the distances** to each gallery embedding. | Eq. 5 for the reproduction. **This differs from SPEC §7.3**, which uses the distance to the mean embedding (a prototype). See decision 2 (§12). |
 | Test and gallery split | §5.1: "we retain 5 sequences per subject as the test set (i.e. each subject has 5 genuine test scores) and let G vary between 1 ≤ G ≤ 10". README code: gallery = sentences 0 … G−1; genuine queries = sentences 10–14. | Same indices |
 | Impostors | §5.1: "for each enrolled subject we choose one test sample from each remaining subject … each subject has 5 genuine scores and k − 1 impostor scores". README code: the impostor query is sentence 11 of every other test subject. | Same |
 | G values | Table 2: G ∈ {1, 2, 5, 7, 10} | The paper's grid for the reproduction. Our own data keeps SPEC §7.3's {1, 3, 5, 10}. |
@@ -184,7 +184,7 @@ Outside the band, we write a gap analysis instead of tuning towards the number.
 |---|---|---|---|
 | 1 | Training subsets may be subsampled | 6 GB GPU (SPEC §7.1) | Probably not needed: 68,000 × 15 sequences × 70 × 5 floats ≈ 1.4 GB in float32. Any subsampling is reported. |
 | 2 | PyTorch instead of Keras | D-001 | Small. We copy Keras's defaults where they matter: batch-norm momentum 0.99 (PyTorch `momentum=0.01`) and ε = 10⁻³; LSTM forget-gate bias initialised to 1; Glorot-uniform input weights and orthogonal recurrent weights. The paper doesn't state its initialisation, so we assume the Keras defaults. |
-| 3 | **No recurrent dropout** in the first run | PyTorch's `nn.LSTM` has none, and a custom cell loses the fast cuDNN kernel | Slightly more overfitting, so perhaps a slightly higher EER. If we land outside the band, we add a custom LSTM cell with recurrent dropout 0.2 and rerun. See question 3. |
+| 3 | **No recurrent dropout** in the first run | PyTorch's `nn.LSTM` has none, and a custom cell loses the fast cuDNN kernel | Slightly more overfitting, so perhaps a slightly higher EER. If we land outside the band, we add a custom LSTM cell with recurrent dropout 0.2 and rerun (decision 3, §12). |
 | 4 | Packed sequences; batch-norm statistics over real keystrokes only | Whether padded zeros entered Keras's batch-norm statistics depends on the Keras version, which isn't stated | Small; it matters only for short sentences |
 | 5 | Final hidden state taken at the last real keystroke | This is what a Keras masked LSTM returns | None |
 | 6 | Learning rate 0.05 as printed; fallback sweep {0.05, 0.01, 0.005} on training-subject validation users if training diverges | 0.05 is high for Adam on an LSTM | None if it trains. A fallback is logged as a deviation. |
@@ -209,7 +209,7 @@ items (Manhattan, divided by the number of shared items). The baseline is unavai
 69 digraphs, most of them unique. With G = 1 or 2, few digraphs reach 3 occurrences. The baseline
 as specified will therefore be **unavailable for many comparisons at small G**. The paper saw a
 similar failure: its digraph/SVM comparison at G = 5, M = 50 was "near chance accuracy" (§6.1). See
-question 1 for how to handle this.
+decision 1 (§12) for how this is handled.
 
 **Pipeline check on labelled synthetic data (D3).** Before any real data, the baseline and the
 EER code run on generated users (filenames and figures marked SYNTHETIC; never reported as
@@ -230,21 +230,18 @@ results):
   `INTEGRITY_DATA_ROOT`. Nothing derived from D1 is committed until the lead has checked the
   licence's redistribution terms.
 
-## 12. Questions for the lead before modelling
+## 12. Decisions (the lead delegated these on 2026-10-24)
 
-1. **The baseline at small G.** Options: (a) report the SPEC §7.2 baseline as-is, with its
-   availability rate, and compute the EER on available comparisons only; (b) also add a second,
-   always-available non-deep baseline: scaled Manhattan distance on sequence-level timing statistics
-   (mean and SD of HL, PL, IL, RL), scaled by training-population spread. **Recommended: (a) + (b).**
-   (b) is still a simple distance, so it answers "what does the LSTM add".
-2. **Scoring rule for our system.** TypeNet scores with the mean distance to each enrollment
-   embedding (Eq. 5). SPEC §7.3 uses the distance to the mean embedding. **Recommended:** Eq. 5 for
-   the reproduction (required), and both pre-registered for our data, with Eq. 5 primary for
-   comparability.
-3. **Recurrent dropout.** Omit it in the first run (fast cuDNN LSTM) and add it only if we miss the
-   band? **Recommended: yes.**
-4. **TypeNet Benchmark embeddings.** BiDA Lab offers, under its own licence agreement, the triplet
-   embeddings (M = 50) of the 100,000 desktop test subjects. With them we could test our EER code
-   against the authors' own embeddings before training anything, which separates "our evaluation
-   is wrong" from "our model is worse". It is a separate licence from Aalto's. Do you want to
-   request it?
+1. **Baseline at small G: both.** (a) The SPEC §7.2 digraph baseline as specified, reported with
+   its availability rate, with the EER computed on available comparisons only. (b) An
+   always-available scaled-Manhattan baseline on per-sequence timing statistics (mean and SD of
+   HL, PL, IL and RL), scaled by the spread over training subjects. Both score a query against the
+   pooled gallery, because a single 70-keystroke sentence is too sparse for a digraph profile.
+2. **Scoring rule: Eq. 5 primary.** Eq. 5 for the reproduction. On our data both rules are
+   pre-registered, with Eq. 5 primary and the prototype rule (SPEC §7.3) as an ablation.
+3. **Recurrent dropout: omitted** in the first PyTorch run. It is added (custom cell) only if an
+   acceptance cell falls outside its band.
+4. **TypeNet Benchmark: recommended, not requested.** It needs the lead's signature on BiDA Lab's
+   licence agreement, so it is an action for the lead. P2 does not depend on it: our EER code is
+   unit-tested against hand-computed cases and against the authors' published algorithm.
+
