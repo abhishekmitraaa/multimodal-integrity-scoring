@@ -18,3 +18,21 @@ keycheck:                        # real-keyboard check report, development data 
   dispatch_time_max_inside_frac: 0.02
   dispatch_time_max_lag_ms: 2.0      # and a median lag below this: timeStamp is the dispatch time
   top_overlap_pairs: 5
+synthetic_keystrokes:            # D3 generator for pipeline tests only; never reported as results
+  dataset_id: d3_synthetic_keystrokes_v1
+  subjects: 100
+  sequences_per_subject: 15      # mirrors the TypeNet protocol (10 gallery + 5 query sentences)
+  keys_per_sequence: 70
+  alphabet: [KeyA, KeyB, KeyC, KeyD, KeyE, KeyF, KeyG, KeyH, KeyI, KeyJ, KeyK, KeyL, KeyM,
+             KeyN, KeyO, KeyP, KeyQ, KeyR, KeyS, KeyT, KeyU, KeyV, KeyW, KeyX, KeyY, KeyZ, Space]
+  vocabulary_words: 300
+  base_flight_ms: 180            # population median press-to-press
+  base_hold_ms: 95
+  digraph_difficulty_log_sd: 0.30   # shared by everyone
+  key_hold_log_sd: 0.15             # shared by everyone
+  user_speed_log_sd: 0.25           # x separation
+  user_digraph_log_sd: 0.25         # x separation
+  user_hold_log_sd: 0.20            # x separation
+  noise_flight_log_sd: 0.25         # within-user, per keystroke
+  noise_hold_log_sd: 0.15
+  separations: [0.0, 0.5, 1.0]      # 0 = everyone types identically (EER should be near 50%)
