@@ -59,6 +59,24 @@ These conditions make the published EERs optimistic compared with our setting:
 
 ## 1. Dataset subset, filtering and the train/test split
 
+**Verified on the data (2026-10-24).** `Keystrokes.zip` from userinterfaces.aalto.fi/136Mkeystrokes
+(1,572,785,433 bytes, sha256 `5fb217e0…88e270420`). Facts:
+
+- **168,593 participants, every one with exactly 15 sentences.** So the "15 sessions" rule
+  filters nobody.
+- **123,108,258 keystroke rows,** against "136M" in the name; the readme does not explain the gap.
+- 745 malformed lines, and 284,864 keystrokes (0.23%) with a release missing or before the press,
+  which are dropped.
+- **Median 46 keystrokes per sentence** (5th–95th percentile 22–80, from a 2,000-participant
+  sample); only 14% reach 70.
+- **Keyboard types** (metadata): laptop 91,250; full desktop 73,758; small physical 1,886;
+  on-screen 1,699. About 2.1% are not desktop or laptop keyboards. TypeNet calls the set desktop
+  and mentions no filter, so we keep everyone and report this.
+- **Licence** (readme.txt): "free to use this data for non-commercial use in your own research or
+  projects with attribution to the authors". Nothing is said about redistribution, so the data and
+  anything derived from it stay outside the repository.
+
+
 | Item | Quote or source | Our choice when not stated |
 |---|---|---|
 | Dataset | §3: "The Dhakal et al. dataset [31] comprises more than 5GB of keystroke data collected on desktop keyboards from 168,000 participants" | Aalto desktop release, downloaded by the lead. Stored under `INTEGRITY_DATA_ROOT/external/aalto_desktop/`, never in the repo. |

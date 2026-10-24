@@ -995,7 +995,7 @@ Shown on the consent screen, the dashboard and in every report:
 
 | ID | Data | Use |
 |---|---|---|
-| D1 | Aalto 136M keystrokes, desktop (Dhakal et al.): 15 memorised sentences per subject, typed in a browser with ms timing (TypeNet §3). **[Licence requested by the lead; redistribution and patent-relevant terms to be checked by the lead]** | encoder pretraining; P2 TypeNet reproduction ([p2_protocol.md](p2_protocol.md)) |
+| D1 | Aalto 136M Keystrokes (Dhakal et al., CHI 2018): 168,593 participants × 15 transcribed sentences, ms timing. Downloaded 2026-10-24 to `D:\integrity-data\externalalto_desktop\` (outside the repo). **Licence: non-commercial research use with attribution.** Redistribution is not addressed. Whether patent-support documents count as commercial use is for the lead to decide. | encoder pretraining; P2 TypeNet reproduction ([p2_protocol.md](p2_protocol.md)) |
 | D1b | *Optional:* TypeNet Benchmark, the authors' triplet embeddings (M = 50) for the 100,000 desktop test subjects, under a separate BiDA Lab licence. Not requested. | checks our EER code against the authors' own embeddings (P2 question 4) |
 | D2 | Our collection: recruit 50+ consenting adult students so that 30–50 complete both sittings; code-typing, with study conditions | fine-tuning, fusion, calibration, evaluation |
 | D3 | **Synthetic**, labelled | pipeline tests only; never reported as results |
@@ -1177,7 +1177,8 @@ the source yet; numbers attributed to them come from the project brief.
    2021"; the authors' README says vol. 4, pp. 57–70, 2022. The IJCB 2020 preliminary version is
    arXiv:2004.03627.
 2. V. Dhakal, A. M. Feit, P. O. Kristensson, A. Oulasvirta. "Observations on Typing from 136
-   Million Keystrokes." *CHI 2018.* **[VERIFY; dataset licence requested by the lead]** Check
+   Million Keystrokes." *CHI 2018*, DOI 10.1145/3173574.3174220 (from the dataset's readme).
+   Dataset licence read: non-commercial research use with attribution. **[VERIFY the paper text]**,
    especially whether each subject's 15 sentences were typed in one sitting
    ([p2_protocol.md](p2_protocol.md) §0.1).
 3. Digital Personal Data Protection Act, 2023 (India). **[VERIFY sections]**
