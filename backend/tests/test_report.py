@@ -140,3 +140,41 @@ def test_unclosed_exam_does_not_drive_the_overall_state(state: str) -> None:
     exam = Log().type(80, 180).paste("x" * 200, after_away_s=30) if state == "review" else Log().type(210, 180)
     r = build_report("DEV-9", practice() + [session("exam", exam, "e", closed=False)], FakeModel(), "", CFG)
     assert exam_state(r) == state and r["overall"]["state"] == "no_exam_yet"
+
+
+# ---- the baseline check (D-038) --------------------------------------------------------------
+
+def check(log: Log, sid: str = "c") -> dict[str, Any]:
+    return {**session("practice", log, sid), "stage": "check"}
+
+
+def test_check_by_the_same_typer_confirms_the_baseline_and_sets_a_personal_line() -> None:
+    r = build_report("DEV-C1", practice() + [check(Log().type(140, 180, seed=21)), session("exam", Log().type(210, 180, seed=9), "e")],
+                     FakeModel(), "", CFG)
+    c = r["baseline"]["check"]
+    assert c["status"] == "confirmed" and c["personal_threshold"] is not None
+    assert [p["problem_id"] for p in r["baseline"]["practice_sessions"]] == ["practice_x"] * 3   # the check is held out
+    ks = r["exams"][0]["keystroke"]
+    assert ks["threshold"] == max(ks["population_threshold"], ks["personal_threshold"])
+    assert exam_state(r) == "no_review_flags"
+
+
+def test_check_that_does_not_match_switches_the_typing_comparison_off() -> None:
+    r = build_report("DEV-C2", practice() + [check(Log().type(140, 400, hold_ms=150, seed=21)),
+                                             session("exam", Log().type(210, 400, hold_ms=150, seed=9), "e")], FakeModel(), "", CFG)
+    assert r["baseline"]["check"]["status"] == "not_confirmed"
+    assert finding(r, "keystroke")["status"] == "unavailable"          # no false flag from an unreliable baseline
+    assert exam_state(r) == "insufficient_data"
+
+
+def test_detection_a_different_typer_in_the_exam_is_flagged_after_a_confirmed_check() -> None:
+    r = build_report("DEV-C3", practice() + [check(Log().type(140, 180, seed=21)),
+                                             session("exam", Log().type(210, 400, hold_ms=150, seed=9), "e")], FakeModel(), "", CFG)
+    assert r["baseline"]["check"]["status"] == "confirmed"
+    assert finding(r, "keystroke")["status"] == "flag" and exam_state(r) == "review"
+
+
+def test_no_check_yet_uses_the_reference_line_and_says_so() -> None:
+    r = build_report("DEV-C4", practice() + [session("exam", Log().type(210, 180, seed=9), "e")], FakeModel(), "", CFG)
+    assert r["baseline"]["check"]["status"] == "not_done"
+    assert "No baseline check was done" in finding(r, "keystroke")["detail"]

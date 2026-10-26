@@ -1,5 +1,6 @@
 id: exam_run_length
 kind: exam
+stage: exam                  # checked against the baseline (D-036)
 title: Run-length encoding
 statement: |
   Write a function `rle(s)` that run-length encodes a string: each run of a repeated character

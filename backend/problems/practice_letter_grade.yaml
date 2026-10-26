@@ -1,5 +1,6 @@
 id: practice_letter_grade
 kind: practice
+stage: baseline              # builds the baseline (D-036)
 title: Letter grade
 statement: |
   Write a function `letter_grade(score)` that turns a score from 0 to 100 into a letter:

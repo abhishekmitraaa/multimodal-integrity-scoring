@@ -1,5 +1,6 @@
 id: practice_sum_evens
 kind: practice
+stage: baseline              # builds the baseline (D-036)
 title: Sum of even numbers
 statement: |
   Write a function `sum_evens(xs)` that returns the sum of the even integers in the list `xs`.

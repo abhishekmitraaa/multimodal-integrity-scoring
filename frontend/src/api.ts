@@ -114,7 +114,8 @@ export interface ExamReport {
   reasons: string[];
   findings: Finding[];
   keystroke: { available: false } | {
-    available: true; g: number; threshold: number; eer_threshold: number; share_above: number;
+    available: true; g: number; threshold: number; population_threshold: number; personal_threshold: number | null;
+    eer_threshold: number; share_above: number;
     windows: Array<{ t: number; distance: number }>;
   };
   habits: { exam: HabitValues | null; baseline: HabitValues | null };
@@ -132,6 +133,7 @@ export interface Report {
     windows_needed: number;
     habits: HabitValues | null;
     note: string;
+    check: BaselineCheck;
   };
   exams: ExamReport[];
   overall: { state: ReportState; reasons: string[] };
@@ -143,5 +145,16 @@ export interface ParticipantSummary {
   pseudonym: string;
   kind: string;
   created_at: string;
-  sessions: Array<{ session_id: string; kind: "practice" | "exam"; problem_id: string; created_at: string; closed: boolean }>;
+  sessions: Array<{ session_id: string; kind: "practice" | "exam"; stage: Stage; problem_id: string; created_at: string; closed: boolean }>;
+}
+
+export type Stage = "baseline" | "check" | "exam";
+
+/** The baseline check (D-038): typing held out from the baseline and compared with it. */
+export interface BaselineCheck {
+  status: "confirmed" | "not_confirmed" | "not_done" | "unavailable";
+  detail: string;
+  windows?: number[];
+  population_threshold?: number;
+  personal_threshold?: number | null;
 }

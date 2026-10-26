@@ -38,3 +38,20 @@ def test_server_never_sends_an_exam_solution_even_if_one_is_added() -> None:
 
 def test_there_are_practice_and_exam_problems() -> None:
     assert PRACTICE and EXAMS
+
+
+def test_stages_baseline_check_exam() -> None:
+    """D-038: practice tasks build the baseline, one check task tests it, the exam is checked against it."""
+    stages = sorted(p["stage"] for p in PROBLEMS.values())
+    assert stages.count("baseline") == 3 and stages.count("check") == 1 and stages.count("exam") == 1
+    assert all(p["kind"] == "practice" for p in PROBLEMS.values() if p["stage"] in ("baseline", "check"))
+
+
+def test_loader_refuses_a_stage_that_does_not_fit_the_kind(tmp_path: Any, monkeypatch: Any) -> None:
+    import integrity_backend.app as app_module
+
+    (tmp_path / "bad.yaml").write_text(
+        "id: bad\nkind: exam\nstage: check\ntitle: t\nstatement: s\nstarter: x\ntests: []\n", encoding="utf-8")
+    monkeypatch.setattr(app_module, "PROBLEMS_DIR", tmp_path)
+    with pytest.raises(ValueError, match="stage must be"):
+        app_module.load_problems()

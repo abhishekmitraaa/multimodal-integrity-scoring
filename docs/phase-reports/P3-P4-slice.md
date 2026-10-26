@@ -30,6 +30,28 @@ system works end to end. It says nothing about how well it detects cheating.
 5. **The reviewer dashboard** (`#/dashboard`) lists every participant with progress, opens the same
    report, and links each exam to its keystroke-by-keystroke replay. Every read is access-logged.
 
+## Addition: the baseline check (D-038, 2026-10-26)
+
+The lead asked for a test after the baseline that checks the baseline and supports detection. Setup
+now has three steps: **practice** (3 tasks, the baseline), **baseline check** (1 task, held out),
+then **exam**.
+
+- **Checks the baseline.** The check task's windows are compared with the practice prototype. If
+  most are within the same-person range, the baseline is *confirmed*. If not, it is *not reliable*
+  for this person, and the exam's typing comparison is switched off for them instead of producing
+  false flags.
+- **Supports detection.** A confirmed check gives the person's own normal range (their largest
+  check distance). The exam uses the higher of that and the reference-data line.
+
+**Synthetic demo with the real model** (`eval/tools/detection_demo/`; two scripted typists, not
+people, three runs, not an accuracy measurement):
+
+| Scenario | Check (distances; reference line 2.13) | Exam distances | Result |
+|---|---|---|---|
+| Same typist throughout | confirmed (0.84, 1.45) | 0.97, 0.97, 1.35 | No review flags |
+| A different typist in the exam | confirmed (1.18, 1.71) | 3.92, 4.18, 4.13 | **Review recommended** |
+| A different typist in the check | does not match (4.30, 4.51) | comparison switched off | Not enough data (no false flag) |
+
 ## How it's built
 
 | Part | Where |

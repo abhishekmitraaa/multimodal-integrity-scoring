@@ -59,6 +59,13 @@ test("practice builds a baseline, the exam is checked, the report and dashboard 
     await expect(page.locator(`button[data-problem="${problem}"]`)).toHaveClass(/task-done/);
   }
 
+  // The baseline check (D-038): typed like practice, held out and compared with the baseline.
+  await openTask(page, "check_count_vowels");
+  await typeCode(page, (await page.textContent("#reference-code"))!);
+  await testAndSubmit(page);
+  await page.click("#another-task");
+  await expect(page.locator('button[data-problem="check_count_vowels"]')).toHaveClass(/task-done/);
+
   // Exam: some typing, then a block of code that arrives without key presses.
   await openTask(page, "exam_run_length");
   await typeCode(page, EXAM_START.join("\n    "));
@@ -77,6 +84,7 @@ test("practice builds a baseline, the exam is checked, the report and dashboard 
   await expect(page.locator('[data-finding="untyped"]')).toHaveClass(/finding-flag/);
   await expect(page.locator('[data-finding="reconciliation"]')).toHaveClass(/finding-flag/);
   await expect(page.locator("#baseline-status")).toContainText(/windows of typing/);
+  await expect(page.locator("#baseline-check")).toContainText(/Baseline check: (confirmed|does not match|could not run)/);
   const ks = page.locator('[data-finding="keystroke"]');
   if (await page.locator(".ks-chart").count()) {
     await expect(ks).toHaveClass(/finding-(ok|flag)/);                  // model installed: compared to the baseline
@@ -89,7 +97,7 @@ test("practice builds a baseline, the exam is checked, the report and dashboard 
   await page.fill("#dash-token", REVIEWER_TOKEN);
   await page.click("#dash-load");
   const row = page.locator(`tr[data-pseudonym="${pseudonym}"]`);
-  await expect(row).toContainText("3 practice · 1 exam");
+  await expect(row).toContainText("3 practice · check ✓ · 1 exam");
   await row.locator("button").click();
   await expect(page.locator("#overall-verdict")).toContainText("Review recommended", { timeout: 60_000 });
   await expect(page.locator("#report a[href^='#/replay?session=']")).toHaveCount(1);

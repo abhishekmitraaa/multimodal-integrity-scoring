@@ -11,6 +11,12 @@ const STATE_TEXT: Record<ReportState, [string, string]> = {
   no_review_flags: ["No review flags", "Nothing in the evidence needs review. This does not certify the work."],
   no_exam_yet: ["No exam yet", "The baseline is being built from practice tasks. The exam is checked against it once it is submitted."],
 };
+const CHECK_TEXT: Record<Report["baseline"]["check"]["status"], string> = {
+  confirmed: "Baseline check: confirmed.",
+  not_confirmed: "Baseline check: does not match.",
+  not_done: "Baseline check: not done yet.",
+  unavailable: "Baseline check: could not run.",
+};
 const STATUS_ICON: Record<Finding["status"], string> = { flag: "⚠", ok: "✓", info: "ℹ", unavailable: "–" };
 const SVG = "http://www.w3.org/2000/svg";
 
@@ -40,7 +46,7 @@ function keystrokeChart(ex: ExamReport): Element | null {
   const k = ex.keystroke;
   const W = 640, H = 190, L = 44, R = 12, T = 12, B = 26;
   const tMax = Math.max(ex.duration_s, ...k.windows.map((w) => w.t), 1);
-  const dMax = Math.max(k.threshold * 1.25, k.eer_threshold * 1.1, ...k.windows.map((w) => w.distance)) * 1.05;
+  const dMax = Math.max(k.threshold * 1.25, k.eer_threshold * 1.1, ...k.windows.map((w) => w.distance)) * 1.05;   // threshold = the line used
   const x = (t: number) => L + (t / tMax) * (W - L - R);
   const y = (d: number) => T + (1 - d / dMax) * (H - T - B);
   const root = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "ks-chart", role: "img",
@@ -52,14 +58,18 @@ function keystrokeChart(ex: ExamReport): Element | null {
   for (const p of ex.pastes) {
     root.append(svg("line", { x1: x(p.t), x2: x(p.t), y1: T, y2: H - B, class: p.provenance === "external" ? "mark-external" : "mark-internal" }));
   }
-  root.append(svg("line", { x1: L, x2: W - R, y1: y(k.threshold), y2: y(k.threshold), class: "line-threshold" }));
-  root.append(svg("text", { x: L + 4, y: y(k.threshold) - 4, class: "tick" }, "same-person 95%"));
+  root.append(svg("line", { x1: L, x2: W - R, y1: y(k.population_threshold), y2: y(k.population_threshold), class: "line-threshold" }));
+  root.append(svg("text", { x: L + 4, y: y(k.population_threshold) - 4, class: "tick" }, "same-person 95% (reference data)"));
+  if (k.personal_threshold !== null && k.personal_threshold > k.population_threshold) {
+    root.append(svg("line", { x1: L, x2: W - R, y1: y(k.personal_threshold), y2: y(k.personal_threshold), class: "line-personal" }));
+    root.append(svg("text", { x: W - R - 4, y: y(k.personal_threshold) - 4, class: "tick", "text-anchor": "end" }, "this person's normal range (baseline check)"));
+  }
   root.append(svg("text", { x: 4, y: y(0) - 2, class: "tick" }, "0"));
   root.append(svg("text", { x: 4, y: y(k.threshold) + 4, class: "tick" }, k.threshold.toFixed(2)));
   const pts = k.windows.map((w) => `${x(w.t)},${y(w.distance)}`).join(" ");
   root.append(svg("polyline", { points: pts, class: "ks-line" }));
   for (const w of k.windows) {
-    root.append(svg("circle", { cx: x(w.t), cy: y(w.distance), r: 4, class: w.distance > k.threshold ? "pt-above" : "pt-below" }));
+    root.append(svg("circle", { cx: x(w.t), cy: y(w.distance), r: 4, class: w.distance > k.threshold ? "pt-above" : "pt-below" }));   // vs the line used
   }
   return root;
 }
@@ -91,7 +101,8 @@ function examSection(ex: ExamReport, replayLink?: (sessionId: string) => string)
     chart ? h("figure", { class: "chart-figure" }, chart,
       h("figcaption", { class: "muted" },
         "Each dot is a window of 70 key presses: its distance from this person's practice typing (lower = more alike). ",
-        "Above the dashed line is further than 95% of same-person comparisons in the reference data. ",
+        "Dashed line: 95% of same-person comparisons in the reference data. Dotted line, when shown: this person's own ",
+        "normal range from the baseline check; the higher of the two is used. ",
         "Red lines: pastes from outside the editor; blue: pastes from inside it.")) : null,
     h("h3", {}, "Typing habits"),
     habitsTable(ex.habits.baseline, ex.habits.exam),
@@ -114,6 +125,8 @@ export function renderReport(r: Report, opts: { replayLink?: (sessionId: string)
       h("p", { id: "baseline-status" }, baselineText),
       b.practice_sessions.length ? h("ul", {}, ...b.practice_sessions.map((p) =>
         h("li", {}, `${p.problem_id}: ${p.keystrokes} key presses, ${p.windows} window(s)`))) : null,
+      h("p", { class: `check check-${b.check.status}`, id: "baseline-check" },
+        h("strong", {}, CHECK_TEXT[b.check.status] + " "), b.check.detail),
       h("p", { class: "muted" }, b.note),
     ),
     ...r.exams.map((ex) => examSection(ex, opts.replayLink)),

@@ -86,3 +86,16 @@ def test_participant_sees_only_submitted_sessions_and_no_server_details(client: 
     staff = client.get(f"/api/participants/{p['pseudonym']}/report", headers=REVIEWER).json()
     assert [e["session_id"] for e in staff["exams"]] == [open_exam]                 # reviewers see it, marked open
     assert staff["exams"][0]["closed"] is False
+
+
+def test_stages_reach_the_dashboard_and_the_report(client: Any) -> None:
+    p = client.post("/api/participants", json={"kind": "synthetic", "age_confirmed": True, "consent": CONSENT}).json()
+    submit(client, p["participant_token"], "practice", "practice_sum_evens",
+           lambda g: g.segment_start() + g.type_text("def f(): pass") + [g.segment_end()])
+    submit(client, p["participant_token"], "practice", "check_count_vowels",
+           lambda g: g.segment_start("check_count_vowels") + g.type_text("def count_vowels(t): return 0") + [g.segment_end()])
+    listed = {x["pseudonym"]: x for x in client.get("/api/participants", headers=REVIEWER).json()}
+    assert [s["stage"] for s in listed[p["pseudonym"]]["sessions"]] == ["baseline", "check"]
+    report = client.get(f"/api/participants/{p['pseudonym']}/report", headers=REVIEWER).json()
+    assert [s["problem_id"] for s in report["baseline"]["practice_sessions"]] == ["practice_sum_evens"]   # check held out
+    assert report["baseline"]["check"]["status"] == "unavailable"        # no model in the test data root

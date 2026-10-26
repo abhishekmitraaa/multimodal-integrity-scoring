@@ -1,0 +1,25 @@
+id: check_count_vowels
+kind: practice
+# The baseline check (D-038): typed after the practice tasks, before the exam. It is held out from
+# the baseline and compared with it, to confirm the baseline and to set this person's own normal range.
+stage: check
+title: Baseline check - count vowels
+statement: |
+  Write a function `count_vowels(text)` that returns how many vowels (a, e, i, o, u, in either case)
+  the text contains.
+starter: |
+  def count_vowels(text):
+      pass
+# Shown to the student to type, like the practice tasks (D-035). Must pass the tests below.
+reference_solution: |
+  def count_vowels(text):
+      vowels = 'aeiou'
+      total = 0
+      for ch in text.lower():
+          if ch in vowels:
+              total += 1
+      return total
+tests:
+  - {call: "count_vowels('Hello World')", expected: "3"}
+  - {call: "count_vowels('')", expected: "0"}
+  - {call: "count_vowels('AEIOU xyz')", expected: "5"}

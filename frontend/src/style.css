@@ -7,6 +7,7 @@
   --error: #b91c1c;
   --ok: #15803d;
   --panel: #ffffff;
+  --warn: #b45309;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   color: var(--fg);
   background: var(--bg);
@@ -22,6 +23,7 @@
     --error: #fca5a5;
     --ok: #86efac;
     --panel: #292524;
+    --warn: #fcd34d;
   }
 }
 
@@ -353,3 +355,9 @@ button.task-done {
   margin-top: 28px;
   font-size: 0.9rem;
 }
+
+/* Baseline check (D-038). */
+.check { padding: 8px 12px; border-left: 4px solid var(--muted); background: var(--panel); }
+.check-confirmed { border-left-color: var(--ok); }
+.check-not_confirmed { border-left-color: var(--warn); }
+.ks-chart .line-personal { stroke: var(--ok); stroke-dasharray: 2 3; stroke-width: 2; }

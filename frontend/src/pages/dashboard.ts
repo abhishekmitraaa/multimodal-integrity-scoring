@@ -7,8 +7,8 @@ import { renderReport } from "../report/render";
 import { store } from "../state";
 
 function progress(p: ParticipantSummary): string {
-  const done = (kind: string) => p.sessions.filter((s) => s.kind === kind && s.closed).length;
-  return `${done("practice")} practice · ${done("exam")} exam`;
+  const done = (stage: string) => p.sessions.filter((s) => s.stage === stage && s.closed).length;
+  return `${done("baseline")} practice · ${done("check") ? "check ✓" : "no check"} · ${done("exam")} exam`;
 }
 
 export function dashboardPage(root: HTMLElement, params: URLSearchParams): void {

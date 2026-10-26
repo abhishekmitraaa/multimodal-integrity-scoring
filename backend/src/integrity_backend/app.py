@@ -38,6 +38,9 @@ def load_problems() -> dict[str, dict[str, Any]]:
             raise ValueError(f"{path.name}: practice tasks need a reference_solution (D-035)")
         if problem["kind"] == "exam" and has_solution:
             raise ValueError(f"{path.name}: exam tasks must not carry a reference_solution")
+        allowed = {"practice": ("baseline", "check"), "exam": ("exam",)}[problem["kind"]]
+        if problem.get("stage") not in allowed:
+            raise ValueError(f"{path.name}: stage must be one of {allowed} for a {problem['kind']} task (D-038)")
         problems[problem["id"]] = problem
     return problems
 
@@ -133,6 +136,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         sessions = await store().participant_sessions_with_events(pseudonym)
         if sessions is None:
             raise HTTPException(404, "unknown participant")
+        for x in sessions:      # baseline / check / exam (D-038), from the problem files
+            x["stage"] = problems.get(x["problem_id"], {}).get("stage", "exam" if x["kind"] == "exam" else "baseline")
         model, note = await asyncio.to_thread(get_model)
         if for_participant:
             # Submitted sessions only: an open exam's report would let a student check, mid-exam,
@@ -258,7 +263,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def list_participants(authorization: str | None = Header(None)) -> list[dict[str, Any]]:
         actor, role = staff(authorization)
         await store().log_access(actor, role, "list_participants", "*")
-        return await store().list_participants()
+        participants = await store().list_participants()
+        for p in participants:
+            for x in p["sessions"]:
+                x["stage"] = problems.get(x["problem_id"], {}).get("stage", "exam" if x["kind"] == "exam" else "baseline")
+        return participants
 
     @app.get("/api/participants/{pseudonym}/report")
     async def staff_report(pseudonym: str, authorization: str | None = Header(None)) -> dict[str, Any]:

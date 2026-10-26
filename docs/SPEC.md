@@ -990,6 +990,8 @@ Shown on the consent screen, the dashboard and in every report:
 
 - `#/dashboard` (reviewer token) lists participants with progress and opens each one's report.
 - `#/my-report` shows a participant their own report, for submitted sessions only.
+- The baseline check (D-038) appears under the baseline as confirmed / does not match / not done, and the
+  exam chart adds the person's own normal-range line when it is higher than the reference line.
 - A report has: the overall state (review / insufficient data / no review flags) with reasons;
   the baseline from the practice tasks; and per exam, findings with plain verdicts, a chart of
   keystroke distance from the baseline per 70-key window against the same-person 95% line (with
@@ -1048,7 +1050,11 @@ The full design follows.
      selected for copying. This replaces the earlier design of about 2 min of transcription plus
      about 8 min of free coding. **All enrollment typing is now transcription.** See the
      consequences in §1.4.
-  3. Expected yield: about 1000+ keystrokes per module, so 5–10 baseline windows are easy to reach.
+  3. **Baseline check [D-038].** After the practice tasks, one more shown-code task is typed. It is
+     held out of the baseline and compared with it. If it matches, the baseline is confirmed and
+     sets the person's own normal range for the exam. If not, the exam's typing comparison is
+     switched off for that person.
+  4. Expected yield: about 1000+ keystrokes per module, so 5–10 baseline windows are easy to reach.
      It may be lower now, because the given solutions are short; this is checked in the pilot.
 - **Sitting 2 (≥ 1 day later, ~60 min).** Short exam tasks, each under one condition. Order is
   counterbalanced (Latin square). Conditions: genuine ×2, A1, A4, A5, A7. A subset of participants

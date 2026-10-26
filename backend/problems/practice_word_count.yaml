@@ -1,5 +1,6 @@
 id: practice_word_count
 kind: practice
+stage: baseline              # builds the baseline (D-036)
 title: Word count
 statement: |
   Write a function `word_count(text)` that returns a dict mapping each lower-cased word to the

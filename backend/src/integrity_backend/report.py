@@ -70,7 +70,9 @@ def build_report(pseudonym: str, sessions: Sequence[SessionEvents], model: Model
                  cfg: Mapping[str, Any]) -> dict[str, Any]:
     """cfg: {"report": scoring.report, "m", "stride", "clip_s", "g_min", "large_insert_chars", "coupling_s"}."""
     rules = cfg["report"]
-    practice = [s for s in sessions if s["kind"] == "practice" and s["closed"]]
+    # Stages (D-038): practice tasks build the baseline; the check task is held out and tested against it.
+    practice = [s for s in sessions if s["kind"] == "practice" and s["closed"] and s.get("stage", "baseline") == "baseline"]
+    checks = [s for s in sessions if s.get("stage") == "check" and s["closed"]]
     exams = [s for s in sessions if s["kind"] == "exam"]
 
     # ---- baseline from the closed practice sessions
@@ -91,9 +93,10 @@ def build_report(pseudonym: str, sessions: Sequence[SessionEvents], model: Model
         "windows_needed": cfg["g_min"], "habits": _mean_habits(practice_habits) if practice_habits else None,
         "note": TRANSCRIPTION_NOTE,
     }
+    baseline["check"] = _check_report(checks, model, prototype, len(windows), cfg, rules)
 
     # ---- each exam against it
-    exam_reports = [_exam_report(s, model, prototype, len(windows), baseline, cfg, rules) for s in exams]
+    exam_reports = [_exam_report(s, model, prototype, len(windows), baseline, baseline["check"], cfg, rules) for s in exams]
     states = [e["state"] for e in exam_reports if e["closed"]]
     overall = ("review" if "review" in states else "insufficient_data" if "insufficient_data" in states
                else "no_review_flags" if states else "no_exam_yet")
@@ -109,8 +112,56 @@ def build_report(pseudonym: str, sessions: Sequence[SessionEvents], model: Model
     }
 
 
+def _distances(model: Model, prototype: NDArray[np.float32], windows: Sequence[NDArray[np.float32]]) -> NDArray[np.float64]:
+    return np.linalg.norm(model.embed(list(windows)).astype(np.float64) - prototype.astype(np.float64), axis=1)
+
+
+def _population_threshold(model: Model, g: int, rules: Mapping[str, Any]) -> tuple[float, Any]:
+    ref = model.reference(g)
+    return float(ref.genuine[rules["keystroke_threshold"].split("_")[1]]), ref
+
+
+def _check_report(checks: Sequence[SessionEvents], model: Model | None, prototype: NDArray[np.float32] | None, g: int,
+                  cfg: Mapping[str, Any], rules: Mapping[str, Any]) -> dict[str, Any]:
+    """The baseline check (D-038): new typing by the same person, compared with the baseline.
+
+    confirmed      most check windows are within the same-person range: the baseline describes this
+                   person, and the largest check distance becomes their personal line for the exam.
+    not_confirmed  most check windows are outside it: the baseline is not reliable for this person, so
+                   the exam's typing comparison is switched off (no false flags from a bad baseline).
+    """
+    if not checks:
+        return {"status": "not_done", "detail": "The baseline check has not been done yet."}
+    if model is None or prototype is None:
+        return {"status": "unavailable", "detail": "The check needs the keystroke model and a ready baseline."}
+    keys = [k for s in checks for k in session_signals(s["events"], cfg["large_insert_chars"], cfg["coupling_s"]).keystrokes]
+    wins = [w for w, _ in exam_windows(keys, cfg["m"], cfg["stride"], cfg["clip_s"])]
+    if not wins:
+        return {"status": "unavailable", "detail": f"The check had fewer than {cfg['m']} key presses."}
+    population, _ = _population_threshold(model, g, rules)
+    dist = _distances(model, prototype, wins)
+    above = float((dist > population).mean())
+    confirmed = above < rules["check_mismatch_share"]
+    personal = float(dist.max()) * float(rules["check_margin"])
+    within = len(wins) - int(round(above * len(wins)))
+    return {
+        "status": "confirmed" if confirmed else "not_confirmed",
+        "windows": [round(float(d), 3) for d in dist],
+        "population_threshold": round(population, 3),
+        "personal_threshold": round(personal, 3) if confirmed else None,
+        "share_above": round(above, 2),
+        "detail": (f"The check typing matches the practice typing: {within} of {len(wins)} windows are within the usual "
+                   f"same-person range. The baseline is confirmed."
+                   if confirmed else
+                   f"The check typing does not match the practice typing ({round(100 * above)}% of {len(wins)} windows are "
+                   f"outside the usual same-person range). The baseline is not reliable for this person, so the typing "
+                   f"comparison is not used in the exam report."),
+    }
+
+
 def _exam_report(s: SessionEvents, model: Model | None, prototype: NDArray[np.float32] | None, g: int,
-                 baseline: Mapping[str, Any], cfg: Mapping[str, Any], rules: Mapping[str, Any]) -> dict[str, Any]:
+                 baseline: Mapping[str, Any], check: Mapping[str, Any], cfg: Mapping[str, Any],
+                 rules: Mapping[str, Any]) -> dict[str, Any]:
     sig = session_signals(s["events"], cfg["large_insert_chars"], cfg["coupling_s"])
     ins, hab = sig.insertions, sig.habits
     starts = [e["t_client_us"] for e in s["events"] if e.get("t_client_us") is not None]
@@ -129,20 +180,28 @@ def _exam_report(s: SessionEvents, model: Model | None, prototype: NDArray[np.fl
     elif not wins:
         findings.append(_finding("keystroke", "unavailable", "Typing rhythm vs baseline",
                                  f"The exam has fewer than {cfg['m']} key presses, so there is no window to compare."))
+    elif check["status"] == "not_confirmed":
+        findings.append(_finding("keystroke", "unavailable", "Typing rhythm vs baseline",
+                                 "The baseline check did not match this person's practice typing, so the baseline is not "
+                                 "reliable for them and the typing comparison is not used (D-038)."))
     else:
-        ref = model.reference(g)
-        threshold = float(ref.genuine[rules["keystroke_threshold"].split("_")[1]])
-        dist = np.linalg.norm(model.embed([w for w, _ in wins]).astype(np.float64) - prototype.astype(np.float64), axis=1)
+        population, ref = _population_threshold(model, g, rules)
+        personal = check.get("personal_threshold")
+        threshold = max(population, personal) if personal is not None else population
+        dist = _distances(model, prototype, [w for w, _ in wins])
         above = float((dist > threshold).mean())
-        keystroke = {"available": True, "g": g, "threshold": round(threshold, 3), "eer_threshold": round(float(ref.eer_threshold), 3),
+        keystroke = {"available": True, "g": g, "threshold": round(threshold, 3), "population_threshold": round(population, 3),
+                     "personal_threshold": personal, "eer_threshold": round(float(ref.eer_threshold), 3),
                      "windows": [{"t": round(t - t0, 1), "distance": round(float(d), 3)} for (_, t), d in zip(wins, dist)],
                      "share_above": round(above, 2)}
         mismatch = above >= rules["keystroke_mismatch_share"] and len(wins) >= rules["keystroke_mismatch_min_windows"]
+        line = ("this person's own normal range from the baseline check" if personal is not None and personal > population
+                else "95% of same-person comparisons in the reference data")
+        caveat = "" if check["status"] == "confirmed" else " (No baseline check was done, so only the reference-data range is used.)"
         findings.append(_finding(
             "keystroke", "flag" if mismatch else "ok", "Typing rhythm vs baseline",
-            f"{round(100 * above)}% of {len(wins)} exam windows are further from this person's practice typing than "
-            f"95% of same-person comparisons in the reference data. "
-            + ("That is unusual for the same person." if mismatch else "That is within the usual range for the same person.")))
+            f"{round(100 * above)}% of {len(wins)} exam windows are further from this person's practice typing than {line}. "
+            + ("That is unusual for the same person." if mismatch else "That is within the usual range for the same person.") + caveat))
 
     # 2. Pastes from outside the editor
     ext = ins.external_paste_chars
