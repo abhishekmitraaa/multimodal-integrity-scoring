@@ -5,7 +5,7 @@ import { h } from "../dom";
 import { replayText } from "../replay";
 import { store } from "../state";
 
-export async function replayPage(root: HTMLElement): Promise<void> {
+export async function replayPage(root: HTMLElement, params: URLSearchParams = new URLSearchParams()): Promise<void> {
   const tokenInput = h("input", { type: "password", id: "staff-token", placeholder: "Reviewer token" }) as HTMLInputElement;
   tokenInput.value = store.staffToken() ?? "";
   const list = h("ul", { id: "sessions" });
@@ -62,4 +62,10 @@ export async function replayPage(root: HTMLElement): Promise<void> {
       error, list, viewer,
     ),
   );
+
+  const wanted = params.get("session");
+  if (wanted && tokenInput.value) {
+    await load();
+    await open(wanted);
+  }
 }

@@ -169,7 +169,8 @@ def _exam_report(s: SessionEvents, model: Model | None, prototype: NDArray[np.fl
     machine = hab.interval_cv is not None and hab.interval_cv < rules["machine_rhythm_cv"] and hab.keystrokes >= rules["machine_rhythm_min_keystrokes"]
     if hab.interval_cv is not None:
         findings.append(_finding("machine_rhythm", "flag" if machine else "ok", "Evenness of typing rhythm",
-                                 f"Key-interval spread {hab.interval_cv:.2f} (people typically show far more variation; an auto-typer is near 0)."))
+                                 f"Key-interval spread {hab.interval_cv:.2f}: unusually even, as an auto-typer would be (people vary far more)."
+                                 if machine else f"Key-interval spread {hab.interval_cv:.2f}: the normal unevenness of human typing (an auto-typer is near 0)."))
     # 7. Context only, never a flag by itself
     findings.append(_finding("away", "info", "Time away from the window", f"{round(ins.away_seconds)} s with the browser window out of focus."))
 

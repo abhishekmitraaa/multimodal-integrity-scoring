@@ -41,6 +41,9 @@ export const store = {
   setSetup: (s: SetupState) => write("setup", s),
   session: (id: string) => read<Record<string, SessionRef>>("sessions")?.[id],
   addSession: (id: string, ref: SessionRef) => write("sessions", { ...(read<Record<string, SessionRef>>("sessions") ?? {}), [id]: ref }),
+  /** Problems this tab's participant has submitted (for the setup page's checkmarks). */
+  done: () => read<string[]>("done") ?? [],
+  markDone: (problemId: string) => write("done", [...new Set([...(read<string[]>("done") ?? []), problemId])]),
   staffToken: () => read<string>("staffToken"),
   setStaffToken: (t: string) => write("staffToken", t),
 };

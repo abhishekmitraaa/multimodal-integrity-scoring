@@ -14,7 +14,11 @@ export function donePage(root: HTMLElement, query: URLSearchParams): void {
       ),
       h("p", { class: "muted" }, "Keep this fingerprint if you might appeal: it changes if anyone later alters your log. It is not yet signed by the server."),
       query.get("drained") === "0" ? h("p", { class: "error", id: "undelivered" }, "Some events may not have been delivered before closing.") : null,
-      h("a", { href: "#/setup" }, "Another task"),
+      query.get("kind") === "exam"
+        ? h("p", { class: "row" },
+          h("a", { href: "#/my-report", class: "button primary", id: "see-report" }, "See your report"),
+          h("a", { href: "#/setup", id: "another-task" }, "Back to the tasks"))
+        : h("p", { class: "row" }, h("a", { href: "#/setup", class: "button primary", id: "another-task" }, "Next task")),
     ),
   );
 }

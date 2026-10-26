@@ -39,3 +39,19 @@ test("the exam task shows no code", async ({ page }) => {
   await expect(page.locator("#problem")).toContainText("Run-length encoding");
   await expect(page.locator("#reference-code")).toHaveCount(0);
 });
+
+test("a slow Python start does not use up the test's time limit", async ({ page, context, browserName }) => {
+  test.skip(browserName !== "chromium", "request interception inside workers is checked in Chromium");
+  test.setTimeout(120_000);
+  // Delay the runtime download past the 10 s execution limit.
+  await context.route("**/pyodide/pyodide.asm.wasm", async (route) => {
+    await new Promise((r) => setTimeout(r, 12_000));
+    await route.continue();
+  });
+  await startSession(page, "practice_sum_evens");
+  await page.locator(".monaco-editor .view-lines").click();
+  await typeCode(page, (await page.textContent("#reference-code"))!);
+  await page.click("#test");
+  await expect(page.locator("#output")).toContainText("Starting Python");
+  await expect(page.locator("#output")).toContainText("3/3 tests passed", { timeout: 90_000 });
+});

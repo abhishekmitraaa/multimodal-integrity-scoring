@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -43,6 +44,11 @@ def main() -> None:
 
     os.environ["DATABASE_URL"] = url
     os.environ.setdefault("INTEGRITY_DATA_ROOT", str(Path(tempfile.gettempdir()) / "integrity-e2e-data"))
+    # The keystroke model (D-036) lives outside the repo; copy it in when this machine has one, so
+    # the report's keystroke check runs end to end. Without it the report says "unavailable".
+    models = Path(os.environ.get("INTEGRITY_E2E_MODELS", r"C:\integrity-data\models"))
+    if models.is_dir():
+        shutil.copytree(models, Path(os.environ["INTEGRITY_DATA_ROOT"]) / "models", dirs_exist_ok=True)
     from integrity_backend.app import create_app
 
     uvicorn.run(create_app(), host="127.0.0.1", port=8000, access_log=False, log_level="warning")

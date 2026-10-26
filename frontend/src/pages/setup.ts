@@ -8,7 +8,8 @@ import { store, type SetupState } from "../state";
 const PROBLEMS: Array<{ id: string; kind: "practice" | "exam"; label: string }> = [
   { id: "practice_sum_evens", kind: "practice", label: "Practice 1: sum of even numbers" },
   { id: "practice_word_count", kind: "practice", label: "Practice 2: word count" },
-  { id: "exam_run_length", kind: "exam", label: "Exam task: run-length encoding" },
+  { id: "practice_letter_grade", kind: "practice", label: "Practice 3: letter grade" },
+  { id: "exam_run_length", kind: "exam", label: "Exam: run-length encoding" },
 ];
 
 export async function setupPage(root: HTMLElement): Promise<void> {
@@ -31,9 +32,11 @@ export async function setupPage(root: HTMLElement): Promise<void> {
     h("option", { value: "other" }, "Other"),
   );
   const error = h("p", { class: "error" });
+  const done = new Set(store.done());
   const buttons = PROBLEMS.map((p) =>
     h("button", {
       "data-problem": p.id,
+      class: done.has(p.id) ? "task-done" : undefined,
       onclick: async () => {
         const setup: SetupState = {
           keyboardType: (keyboard as HTMLSelectElement).value as SetupState["keyboardType"],
@@ -48,16 +51,26 @@ export async function setupPage(root: HTMLElement): Promise<void> {
           error.textContent = String(err);
         }
       },
-    }, p.label),
+    }, done.has(p.id) ? `✓ ${p.label}` : p.label),
   );
+  const practiceButtons = buttons.filter((_, i) => PROBLEMS[i].kind === "practice");
+  const examButtons = buttons.filter((_, i) => PROBLEMS[i].kind === "exam");
+  const practiceDone = PROBLEMS.filter((p) => p.kind === "practice" && done.has(p.id)).length;
   root.replaceChildren(
     h("main", { class: "narrow" },
       h("h1", {}, "Before you start"),
       h("p", {}, `Your pseudonym: `, h("code", { id: "pseudonym" }, participant.pseudonym), ". Keep it if you may want to withdraw later."),
       h("label", {}, "Which keyboard are you using? ", keyboard),
       detected ? h("p", {}, `Keyboard layout detected: ${detected}.`) : h("label", {}, "Keyboard layout: ", layout),
-      h("h2", {}, "Choose a task"),
-      h("div", { class: "row" }, ...buttons),
+      h("h2", {}, "Step 1: practice tasks"),
+      h("p", { class: "muted" }, "Each practice task shows the code to type. Your typing here builds your personal baseline. ",
+        `Done: ${practiceDone} of ${practiceButtons.length}.`),
+      h("div", { class: "row" }, ...practiceButtons),
+      h("h2", {}, "Step 2: exam"),
+      h("p", { class: "muted" }, "Solve it yourself. Afterwards it is checked against your practice baseline and you can see the report.",
+        practiceDone < practiceButtons.length ? " Finish the practice tasks first for a reliable baseline." : ""),
+      h("div", { class: "row" }, ...examButtons),
+      done.has("exam_run_length") ? h("p", {}, h("a", { href: "#/my-report", id: "setup-report" }, "See your report")) : null,
       error,
     ),
   );

@@ -104,7 +104,8 @@ export async function sessionPage(root: HTMLElement, sessionId: string): Promise
 
   const runner = new PyRunner();
   const runCode = async (kind: "run" | "test") => {
-    output.textContent = kind === "run" ? "Running…" : "Testing…";
+    output.textContent = runner.loaded ? (kind === "run" ? "Running…" : "Testing…")
+      : "Starting Python (the first time can take a minute on a slow computer)…";
     const version = editor.getModel()!.getVersionId();
     const result = await runner.run(kind, editor.getValue(), problem.tests);
     log.push("run", {
@@ -136,7 +137,8 @@ export async function sessionPage(root: HTMLElement, sessionId: string): Promise
     const receipt = await api.closeSession(sessionId, ref.token);
     transport.close();
     window.clearInterval(flushTimer);
-    location.hash = `#/done/${sessionId}?n=${receipt.n_events}&head=${receipt.head_hash}&drained=${drained ? 1 : 0}`;
+    store.markDone(ref.problemId);
+    location.hash = `#/done/${sessionId}?n=${receipt.n_events}&head=${receipt.head_hash}&drained=${drained ? 1 : 0}&kind=${ref.kind}`;
   });
 
   window.addEventListener("pagehide", () => {

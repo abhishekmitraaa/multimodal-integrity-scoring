@@ -61,7 +61,10 @@ export const api = {
   sessionState: (id: string, token: string) => call<{ text: string; n_events: number }>(`/api/sessions/${id}/state`, {}, token),
   closeSession: (id: string, token: string) =>
     call<{ n_events: number; head_hash: string; signed: boolean }>(`/api/sessions/${id}/close`, { method: "POST" }, token),
+  myReport: (participantToken: string) => call<Report>("/api/me/report", {}, participantToken),
   staff: {
+    participants: (token: string) => call<ParticipantSummary[]>("/api/participants", {}, token),
+    report: (pseudonym: string, token: string) => call<Report>(`/api/participants/${encodeURIComponent(pseudonym)}/report`, {}, token),
     sessions: (token: string) => call<Array<Record<string, unknown>>>("/api/sessions", {}, token),
     events: (id: string, token: string) => call<{ events: StaffEvent[] }>(`/api/sessions/${id}/events`, {}, token),
     verify: (id: string, token: string) =>
@@ -80,4 +83,65 @@ export interface StaffEvent {
   t_client_us: number | null;
   t_server_us: number;
   data: Record<string, unknown>;
+}
+
+// ---- evidence report (D-036); built on the server by backend/report.py
+
+export type ReportState = "review" | "insufficient_data" | "no_review_flags" | "no_exam_yet";
+
+export interface Finding {
+  id: string;
+  status: "flag" | "ok" | "info" | "unavailable";
+  title: string;
+  detail: string;
+}
+
+export interface HabitValues {
+  interval_cv: number | null;
+  pause_share_2s: number | null;
+  revisions_per_100: number | null;
+  chars_per_minute: number | null;
+  keystrokes: number;
+  typed_chars: number;
+}
+
+export interface ExamReport {
+  session_id: string;
+  problem_id: string;
+  closed: boolean;
+  duration_s: number;
+  state: Exclude<ReportState, "no_exam_yet">;
+  reasons: string[];
+  findings: Finding[];
+  keystroke: { available: false } | {
+    available: true; g: number; threshold: number; eer_threshold: number; share_above: number;
+    windows: Array<{ t: number; distance: number }>;
+  };
+  habits: { exam: HabitValues | null; baseline: HabitValues | null };
+  pastes: Array<{ t: number; chars: number; provenance: string }>;
+}
+
+export interface Report {
+  pseudonym: string;
+  generated_at: string;
+  model: { available: boolean; note: string };
+  baseline: {
+    status: "ready" | "insufficient" | "none";
+    practice_sessions: Array<{ session_id: string; problem_id: string; keystrokes: number; windows: number }>;
+    windows: number;
+    windows_needed: number;
+    habits: HabitValues | null;
+    note: string;
+  };
+  exams: ExamReport[];
+  overall: { state: ReportState; reasons: string[] };
+  no_score_note: string;
+  false_flag_note: string;
+}
+
+export interface ParticipantSummary {
+  pseudonym: string;
+  kind: string;
+  created_at: string;
+  sessions: Array<{ session_id: string; kind: "practice" | "exam"; problem_id: string; created_at: string; closed: boolean }>;
 }

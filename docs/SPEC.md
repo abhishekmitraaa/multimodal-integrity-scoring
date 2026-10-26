@@ -630,7 +630,7 @@ are shared, the baseline is unavailable.
   - The switch was made before any D2 data exists, so no test result of ours informed it.
 - **Report.** EER against $G \in \{1, 3, 5, 10\}$ for both the encoder and the digraph baseline.
 - **Minimum.** The keystroke modality is unavailable for a participant with fewer than
-  `models.enrollment.g_min` (5) valid enrollment windows.
+  `models.enrollment.g_min` (3, lowered from 5 by D-037) valid enrollment windows.
 
 ### 7.4 Fusion [BRIEF]
 
@@ -985,6 +985,22 @@ Shown on the consent screen, the dashboard and in every report:
 ---
 
 ## 11. Reviewer dashboard (P4)
+
+**Built so far (D-036, 2026-10-26): evidence report and dashboard, before the fusion model.**
+
+- `#/dashboard` (reviewer token) lists participants with progress and opens each one's report.
+- `#/my-report` shows a participant their own report, for submitted sessions only.
+- A report has: the overall state (review / insufficient data / no review flags) with reasons;
+  the baseline from the practice tasks; and per exam, findings with plain verdicts, a chart of
+  keystroke distance from the baseline per 70-key window against the same-person 95% line (with
+  paste markers), typing habits beside the baseline, and a link to the replay. It carries the
+  §10.8 false-flag text and says that there is no single score yet.
+- Built by `backend/report.py` from `ml/session_features.py` (the same signal code offline and
+  online). Rules are in `config/scoring.yaml → report`; they are hand-set and not calibrated.
+- Not yet built: the $\tilde S(t)$ timeline (needs the fusion model), decisions, appeals, and the
+  audit-log view.
+
+The full design follows.
 
 - **Session timeline.** $\tilde S(t)$ with the threshold. Markers for pastes (coloured by
   provenance), large inserts, AST jumps, pauses > 2 s, focus losses, runs, `replay_mismatch` and

@@ -1,7 +1,9 @@
 import "./style.css";
 import { consentPage } from "./pages/consent";
+import { dashboardPage } from "./pages/dashboard";
 import { donePage } from "./pages/done";
 import { keycheckPage } from "./pages/keycheck";
+import { myReportPage } from "./pages/myReport";
 import { replayPage } from "./pages/replay";
 import { sessionPage } from "./pages/session";
 import { setupPage } from "./pages/setup";
@@ -22,7 +24,9 @@ async function route(): Promise<void> {
   if (parts[0] === "setup") return setupPage(root);
   if (parts[0] === "session" && parts[1]) return sessionPage(root, parts[1]);
   if (parts[0] === "done" && parts[1]) return donePage(root, new URLSearchParams(query));
-  if (parts[0] === "replay") return replayPage(root);
+  if (parts[0] === "replay") return replayPage(root, new URLSearchParams(query));
+  if (parts[0] === "dashboard") return dashboardPage(root, new URLSearchParams(query));
+  if (parts[0] === "my-report") return myReportPage(root);
   if (parts[0] === "keycheck") return keycheckPage(root, new URLSearchParams(query));
   return consentPage(root);
 }

@@ -44,7 +44,7 @@ seqstat_baseline:                # always-available non-deep baseline (D-031, p2
   distance: scaled_manhattan         # mean over stats of |query - gallery mean| / scale
 enrollment:
   g_values: [1, 3, 5, 10]        # [BRIEF]
-  g_min: 5
+  g_min: 3                       # D-037 (was 5): the three short practice tasks give about 4-6 windows
   scoring: prototype             # D-033: online and primary on our data; Eq. 5 (mean_distance_to_gallery) is the ablation
 fusion:
   model: logistic_regression     # [BRIEF] MLP only if ablation shows gain

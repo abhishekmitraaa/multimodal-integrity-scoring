@@ -55,8 +55,8 @@ The full design is in [docs/SPEC.md](docs/SPEC.md) and decisions are logged in
 | P0 | Repo skeleton and spec | approved with changes |
 | P1 | Capture app, server log, replay | approved ([report](docs/phase-reports/P1.md)) |
 | P2 | Keystroke features and baseline model on public data | **approved** ([report](docs/phase-reports/P2.md)): TypeNet reproduced within every acceptance band on the Aalto data; human real-keyboard check still open |
-| P3 | Enrollment, process/AST/clipboard features, fusion, thresholds | not started |
-| P4 | Reviewer dashboard | not started |
+| P3 | Enrollment, process/AST/clipboard features, fusion, thresholds | started: baseline from practice, exam checked against it, evidence rules and reconciliation (D-036). Not yet: AST features, fusion model, calibrated thresholds |
+| P4 | Reviewer dashboard | started: participant list, evidence report, replay links, the participant's own report (D-036). Not yet: decisions, appeals, audit-log view |
 | P5 | Data collection tooling, evaluation harness, attack report | not started; ethics checklist first |
 | P6 | Paper and patent-support documents | not started |
 
@@ -93,7 +93,9 @@ everything, press Ctrl+C and close the backend window.
 |---|---|---|
 | App: consent → tasks → Run/Test → Submit → "Another task" | http://127.0.0.1:5173/ | **yes** |
 | Real-keyboard check ([docs/keycheck.md](docs/keycheck.md)) | http://127.0.0.1:5173/#/keycheck | no |
+| Reviewer dashboard: every participant and their evidence report (reviewer token) | http://127.0.0.1:5173/#/dashboard | yes |
 | Reviewer replay (token in `~/.integrity-exam/secrets/reviewer_token.txt`) | http://127.0.0.1:5173/#/replay | yes |
+| A participant's own report (after submitting the exam) | http://127.0.0.1:5173/#/my-report | yes |
 
 The app creates `DEV-` participants. Real participants are refused until `real_collection_enabled`
 is set after ethics approval. If the backend isn't running, the consent page says so at the top and
