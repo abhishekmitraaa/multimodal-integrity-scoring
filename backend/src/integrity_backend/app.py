@@ -19,7 +19,8 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from .chain import verify_chain
 from .crypto import FieldCipher
 from .replay import replay
-from .settings import Settings, load_settings
+from .report import build_report
+from .settings import Settings, load_config, load_settings
 from .store import Store, now_us
 from .wire import WireError, parse_message, validate_batch
 
@@ -89,9 +90,51 @@ def _events_payload(links: list[Any]) -> list[dict[str, Any]]:
     ]
 
 
+def report_config() -> dict[str, Any]:
+    """Settings for build_report, all from config/ (no magic numbers in code)."""
+    features, models, scoring, capture = (load_config(n) for n in ("features", "models", "scoring", "capture"))
+    return {
+        "report": scoring["report"],
+        "m": int(features["keystroke"]["window_keystrokes"]),
+        "stride": int(features["keystroke"]["exam_stride"]),
+        "clip_s": float(features["keystroke"]["latency_clip_ms"]) / 1000,
+        "g_min": int(models["enrollment"]["g_min"]),
+        "large_insert_chars": int(capture["snapshot"]["large_insert_min_chars"]),
+        "coupling_s": float(features["clipboard"]["focus_paste_coupling_s"]),
+    }
+
+
+def load_keystroke_model(data_root: Path, model_file: str) -> tuple[Any, str]:
+    """(model or None, note). The model is optional: without it the keystroke check says so."""
+    path = data_root / model_file
+    if not path.exists():
+        return None, f"No keystroke model at {path}. Run integrity_eval.serving_calibration (docs/phase-reports/P2.md)."
+    try:
+        from integrity_ml.serving import KeystrokeModel
+
+        model = KeystrokeModel(path, load_config("models")["keystroke_encoder"])
+    except Exception as exc:  # noqa: BLE001 - report any load problem instead of failing the report
+        return None, f"The keystroke model could not be loaded: {exc}"
+    return model, "Reference ranges: " + str(model.calibration_meta.get("source", ""))
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or load_settings()
     problems = load_problems()
+    rcfg = report_config()
+    keystroke_model: dict[str, Any] = {}
+
+    def get_model() -> tuple[Any, str]:
+        if "loaded" not in keystroke_model:      # loaded on first use: torch is slow to import
+            keystroke_model["loaded"] = load_keystroke_model(settings.data_root, rcfg["report"]["model_file"])
+        return keystroke_model["loaded"]  # type: ignore[no-any-return]
+
+    async def participant_report(pseudonym: str) -> dict[str, Any]:
+        sessions = await store().participant_sessions_with_events(pseudonym)
+        if sessions is None:
+            raise HTTPException(404, "unknown participant")
+        model, note = await asyncio.to_thread(get_model)
+        return await asyncio.to_thread(build_report, pseudonym, sessions, model, note, rcfg)
     policy = policy_payload(settings.editor_policy)
     prefixes = {
         "real": settings.privacy["pseudonym"]["prefix_real"],
@@ -205,6 +248,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         actor, role = staff(authorization)
         await store().log_access(actor, role, "list_sessions", "*")
         return await store().list_sessions()
+
+    @app.get("/api/participants")
+    async def list_participants(authorization: str | None = Header(None)) -> list[dict[str, Any]]:
+        actor, role = staff(authorization)
+        await store().log_access(actor, role, "list_participants", "*")
+        return await store().list_participants()
+
+    @app.get("/api/participants/{pseudonym}/report")
+    async def staff_report(pseudonym: str, authorization: str | None = Header(None)) -> dict[str, Any]:
+        actor, role = staff(authorization)
+        await store().log_access(actor, role, "read_report", pseudonym)
+        return await participant_report(pseudonym)
+
+    @app.get("/api/me/report")
+    async def own_report(authorization: str | None = Header(None)) -> dict[str, Any]:
+        """A participant's own report (SPEC 10.10: participants can view their own evidence)."""
+        pseudonym = await store().participant_by_token(_bearer(authorization))
+        if pseudonym is None:
+            raise HTTPException(403, "not authorised")
+        await store().log_access(pseudonym, "participant", "read_own_report", pseudonym)
+        return await participant_report(pseudonym)
 
     @app.get("/api/sessions/{session_id}/events")
     async def session_events(session_id: str, authorization: str | None = Header(None)) -> dict[str, Any]:

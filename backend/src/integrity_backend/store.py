@@ -150,6 +150,46 @@ class Store:
             for r in rows
         ]
 
+    async def list_participants(self) -> list[dict[str, Any]]:
+        """Participants (not withdrawn) with a summary of their sessions, newest first."""
+        async with self.engine.connect() as conn:
+            rows = (
+                await conn.execute(
+                    text(
+                        "SELECT p.pseudonym, p.kind AS pkind, p.created_at, s.session_id, s.kind, s.problem_id, "
+                        "s.created_at AS s_created, s.closed_at FROM participants p "
+                        "LEFT JOIN sessions s ON s.pseudonym = p.pseudonym WHERE p.withdrawn_at IS NULL "
+                        "ORDER BY p.created_at DESC, s.created_at"
+                    )
+                )
+            ).all()
+        out: dict[str, dict[str, Any]] = {}
+        for r in rows:
+            entry = out.setdefault(r.pseudonym, {"pseudonym": r.pseudonym, "kind": r.pkind,
+                                                 "created_at": r.created_at.isoformat(), "sessions": []})
+            if r.session_id is not None:
+                entry["sessions"].append({"session_id": str(r.session_id), "kind": r.kind, "problem_id": r.problem_id,
+                                          "created_at": r.s_created.isoformat(), "closed": r.closed_at is not None})
+        return list(out.values())
+
+    async def participant_sessions_with_events(self, pseudonym: str) -> list[dict[str, Any]] | None:
+        """Every session of a participant with its decrypted client and server events, oldest first."""
+        async with self.engine.connect() as conn:
+            exists = (await conn.execute(text("SELECT 1 FROM participants WHERE pseudonym = :p AND withdrawn_at IS NULL"),
+                                         {"p": pseudonym})).first()
+            if exists is None:
+                return None
+            rows = (await conn.execute(text("SELECT session_id, kind, problem_id, closed_at FROM sessions "
+                                            "WHERE pseudonym = :p ORDER BY created_at"), {"p": pseudonym})).all()
+        sessions = []
+        for r in rows:
+            _, links = await self.load_links(str(r.session_id))
+            sessions.append({
+                "session_id": str(r.session_id), "kind": r.kind, "problem_id": r.problem_id, "closed": r.closed_at is not None,
+                "events": [{"type": lk.record.type, "t_client_us": lk.record.t_client_us, "data": lk.record.data} for lk in links],
+            })
+        return sessions
+
     # ---- event log -----------------------------------------------------------------------
 
     async def _lock(self, conn: AsyncConnection, session_id: str) -> Any:

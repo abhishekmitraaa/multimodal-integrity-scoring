@@ -13,3 +13,14 @@ insufficient:
   max_unavailable_tick_frac: 0.5
   require_enrollment: true
 latency_budget_ms: 50
+report:                          # evidence report (D-036). Hand-set rules, NOT calibrated: no fused score S yet.
+  model_file: models/keystroke_encoder_m70.pt   # under INTEGRITY_DATA_ROOT; missing -> keystroke check "unavailable"
+  keystroke_threshold: genuine_p95              # a window is "unlike the baseline" above this same-person quantile
+  keystroke_mismatch_share: 0.5                 # flag when at least this share of exam windows is unlike the baseline
+  keystroke_mismatch_min_windows: 2
+  external_paste_min_chars: 40                  # flag pastes from outside the editor of at least this size
+  untyped_share: 0.3                            # flag when this share of inserted characters was not typed...
+  untyped_min_chars: 40                         # ...and at least this many
+  typed_beyond_keystrokes_min: 20               # flag "typed" characters without matching key presses (D-026)
+  machine_rhythm_cv: 0.15                       # flag a key-interval spread below this...
+  machine_rhythm_min_keystrokes: 70             # ...over at least this many key presses
