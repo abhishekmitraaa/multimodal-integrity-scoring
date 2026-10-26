@@ -14,6 +14,7 @@ offline analysis (SPEC 6: the server never reimplements a feature).
 
 from __future__ import annotations
 
+import bisect
 import hashlib
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
@@ -115,6 +116,11 @@ class Insertions:
     typed_chars_beyond_keystrokes: int
 
 
+def _any_within(sorted_times: list[float], lo: float, hi: float) -> bool:
+    i = bisect.bisect_left(sorted_times, lo)
+    return i < len(sorted_times) and sorted_times[i] <= hi
+
+
 def insertions(events: Sequence[Event], large_insert_chars: int, coupling_s: float) -> Insertions:
     ev = _client(events)
     copies: dict[str, str] = {}
@@ -125,8 +131,14 @@ def insertions(events: Sequence[Event], large_insert_chars: int, coupling_s: flo
     unexplained: list[tuple[float, int, str]] = []
     char_keydowns = 0
     typed_nonspace = 0
-    paste_events = [(e["t_client_us"] / 1e6, int(e["data"]["len"])) for e in ev if e["type"] == "paste"]
-    chord_downs = [e["t_client_us"] / 1e6 for e in ev if e["type"] == "keydown" and (int(e["data"].get("mods", 0)) & (2 | 4 | 8))]
+    # Sorted times, so each check is a binary search, not a scan (bounded cost on long or hostile logs).
+    paste_by_len: dict[int, list[float]] = {}
+    for e in ev:
+        if e["type"] == "paste":
+            paste_by_len.setdefault(int(e["data"]["len"]), []).append(e["t_client_us"] / 1e6)
+    for times in paste_by_len.values():
+        times.sort()
+    chord_downs = sorted(e["t_client_us"] / 1e6 for e in ev if e["type"] == "keydown" and (int(e["data"].get("mods", 0)) & (2 | 4 | 8)))
     first_t = ev[0]["t_client_us"] / 1e6 if ev else 0.0
     for e in ev:
         t, d = e["t_client_us"] / 1e6, e["data"]
@@ -152,8 +164,8 @@ def insertions(events: Sequence[Event], large_insert_chars: int, coupling_s: flo
                 pastes.append(Paste(t, n, prov))
             if n >= large_insert_chars and not d.get("flush"):
                 explained = (
-                    (cause == "paste" and any(abs(pt - t) <= 1.0 and pl == n for pt, pl in paste_events))
-                    or (cause in ("command", "undo", "redo", "cut") and any(0 <= t - ct <= 1.0 for ct in chord_downs))
+                    (cause == "paste" and _any_within(paste_by_len.get(n, []), t - 1.0, t + 1.0))
+                    or (cause in ("command", "undo", "redo", "cut") and _any_within(chord_downs, t - 1.0, t))
                     or t - first_t < 1.0      # restoring the starter or a reload
                 )
                 if not explained:

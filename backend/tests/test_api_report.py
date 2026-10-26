@@ -72,3 +72,17 @@ def test_report_access_is_refused_without_the_right_token(client: Any) -> None:
     assert client.get("/api/participants", headers={"Authorization": "Bearer nope"}).status_code == 403
     assert client.get("/api/me/report", headers={"Authorization": "Bearer nope"}).status_code == 403
     assert client.get("/api/participants/SYN-NOBODY00/report", headers=REVIEWER).status_code == 404
+
+
+def test_participant_sees_only_submitted_sessions_and_no_server_details(client: Any) -> None:
+    p = client.post("/api/participants", json={"kind": "synthetic", "age_confirmed": True, "consent": CONSENT}).json()
+    submit(client, p["participant_token"], "practice", "practice_sum_evens",
+           lambda g: g.segment_start() + g.type_text("def f(): pass") + [g.segment_end()])
+    r = client.post("/api/sessions", json={"participant_token": p["participant_token"], "kind": "exam", "problem_id": "exam_run_length"})
+    open_exam = r.json()["session_id"]                         # started, not submitted
+    own = client.get("/api/me/report", headers={"Authorization": f"Bearer {p['participant_token']}"}).json()
+    assert own["exams"] == [] and own["overall"]["state"] == "no_exam_yet"
+    assert "\\" not in own["model"]["note"] and "/" not in own["model"]["note"]      # no server path
+    staff = client.get(f"/api/participants/{p['pseudonym']}/report", headers=REVIEWER).json()
+    assert [e["session_id"] for e in staff["exams"]] == [open_exam]                 # reviewers see it, marked open
+    assert staff["exams"][0]["closed"] is False

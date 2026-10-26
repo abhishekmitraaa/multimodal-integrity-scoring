@@ -129,11 +129,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             keystroke_model["loaded"] = load_keystroke_model(settings.data_root, rcfg["report"]["model_file"])
         return keystroke_model["loaded"]  # type: ignore[no-any-return]
 
-    async def participant_report(pseudonym: str) -> dict[str, Any]:
+    async def participant_report(pseudonym: str, for_participant: bool = False) -> dict[str, Any]:
         sessions = await store().participant_sessions_with_events(pseudonym)
         if sessions is None:
             raise HTTPException(404, "unknown participant")
         model, note = await asyncio.to_thread(get_model)
+        if for_participant:
+            # Submitted sessions only: an open exam's report would let a student check, mid-exam,
+            # whether they are being flagged. And no server paths or exception text.
+            sessions = [x for x in sessions if x["closed"]]
+            note = "Keystroke reference ranges from a public dataset." if model is not None else "The typing check is not available on this server."
         return await asyncio.to_thread(build_report, pseudonym, sessions, model, note, rcfg)
     policy = policy_payload(settings.editor_policy)
     prefixes = {
@@ -268,7 +273,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if pseudonym is None:
             raise HTTPException(403, "not authorised")
         await store().log_access(pseudonym, "participant", "read_own_report", pseudonym)
-        return await participant_report(pseudonym)
+        return await participant_report(pseudonym, for_participant=True)
 
     @app.get("/api/sessions/{session_id}/events")
     async def session_events(session_id: str, authorization: str | None = Header(None)) -> dict[str, Any]:
