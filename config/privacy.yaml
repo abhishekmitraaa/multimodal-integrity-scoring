@@ -14,7 +14,7 @@ forbidden_data_root_markers: [OneDrive, Dropbox, "Google Drive", iCloud]
 encryption:
   algorithm: aes-256-gcm
   key_file: data_key.bin         # relative to the secrets directory
-  encrypted_fields: [events.data]   # P1; notes and appeals added in P4
+  encrypted_fields: [events.data, review_decisions.notes_ct, appeals.note_ct]   # notes and appeals: P4 (D-039)
 signing:                         # deferred (D-017)
   algorithm: ed25519
   key_file: chain_signing_key.pem
