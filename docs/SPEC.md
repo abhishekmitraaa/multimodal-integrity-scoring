@@ -546,6 +546,14 @@ The process baseline $b_u$ is the mean feature vector over the participant's pra
 per-feature scale $s_k$ is the pooled **within-user** SD from training users; per-user SDs from 2–3
 modules are too noisy to use.
 
+**Built (D-043, 2026-10-27):** `ml/src/integrity_ml/process_features.py` computes all 14 features
+over any time window (whole module or the trailing horizon), plus $b_u$, the pooled within-user
+$s_k$ and $d_{proc}$. Choices: burst "typed chars" are character keydowns; `flight_cv`/`hold_cv` use
+intervals under the burst gap; `linearity` counts typed chars that follow an earlier insertion;
+survival and linearity track at most `process.max_changes` changes (then unavailable); rates need
+`process.min_typed_chars`. The report shows the exam and practice values to reviewers only, with
+no distance or flag until study data gives $s_k$.
+
 ### 6.3 AST features [BRIEF]
 
 The parser is tree-sitter with the Python grammar, pinned version, grammar hash recorded. It tolerates

@@ -142,6 +142,17 @@ def test_participant_texts_carry_no_numbers() -> None:
     assert "windows" not in out["baseline"]["check"] and out["exams"][0]["keystroke"] == {"available": False, "redacted": True}
 
 
+def test_participants_do_not_get_the_process_comparison() -> None:
+    from integrity_backend.app import redact_for_participant
+
+    report = {"baseline": {"check": {"status": "not_done", "detail": ""}, "process": {"linearity": 1.0}},
+              "exams": [{"keystroke": {"available": False}, "findings": [], "reasons": [],
+                         "process": {"exam": {"linearity": 0.5}, "baseline": {"linearity": 1.0}}}],
+              "overall": {"state": "no_review_flags", "reasons": []}}
+    out = redact_for_participant(report)
+    assert "process" not in out["baseline"] and "process" not in out["exams"][0]
+
+
 def test_two_concurrent_check_requests_create_only_one_session(client: Any) -> None:
     from concurrent.futures import ThreadPoolExecutor
 

@@ -137,6 +137,8 @@ export interface ExamReport {
   habits: { exam: HabitValues | null; baseline: HabitValues | null };
   pastes: Array<{ t: number; chars: number; provenance: string }>;
   ast_jumps?: Array<{ t: number; added_nodes: number; keydowns: number }>;
+  /** SPEC 6.2, reviewers only: the whole exam next to the practice mean (null = not enough input). */
+  process?: { exam: Record<string, number | null>; baseline: Record<string, number | null> | null };
   decisions?: Decision[];
   appeals?: Appeal[];
 }

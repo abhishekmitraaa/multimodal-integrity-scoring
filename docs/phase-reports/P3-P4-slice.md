@@ -98,6 +98,17 @@ The first part of P4, built after "continue".
 - **Retention job:** `scripts/purge_retention.py`, dry run unless `--apply`; refuses while the
   dates are blank. Derived features in the data root are reported as due, for manual deletion.
 
+## Addition: process features (D-043, 2026-10-27)
+
+- All 14 SPEC 6.2 features in `ml/src/integrity_ml/process_features.py`, over the whole module or
+  any time window, with the baseline, the scale fit and the distance. 11 unit tests on hand-built
+  logs with worked-out answers.
+- The reviewer's report has a "How the code was written" table: exam beside the practice mean.
+  Context only: what is unusual needs each feature's normal spread from study data. Participants
+  don't see it.
+- With this, every signal the fused score needs exists (keystroke, process, AST, clipboard). The
+  fusion itself still waits for labelled study data.
+
 ## How it's built
 
 | Part | Where |

@@ -120,6 +120,36 @@ function reviewSection(ex: ExamReport, extra: Node | null): HTMLElement | null {
   );
 }
 
+const PROCESS_LABELS: Array<[string, string]> = [
+  ["linearity", "Typed at the end of the previous insertion (share)"],
+  ["short_survival", "Typed characters deleted again (share)"],
+  ["revision_rate", "Backspace/Delete per 100 typed characters"],
+  ["ins_del_ratio", "Typed characters per deleted character"],
+  ["pause_frac_200ms", "Key intervals over 200 ms (share)"],
+  ["pause_frac_2s", "Key intervals over 2 s (share)"],
+  ["burst_len", "Key presses per burst (median)"],
+  ["pre_burst_pause", "Pause before long bursts ÷ typing interval"],
+  ["speed_cv", "Typing-speed spread over 10 s bins"],
+  ["flight_cv", "Key-to-key interval spread"],
+  ["hold_cv", "Key hold-time spread"],
+  ["edit_locality", "Lines between consecutive edits (median)"],
+  ["runs_per_100", "Test runs per 100 typed characters"],
+  ["edits_between_runs", "Typed characters between test runs (median)"],
+];
+
+/** Process features (SPEC 6.2) beside the practice mean, for reviewers. No thresholds yet. */
+function processTable(p: NonNullable<ExamReport["process"]>): HTMLElement {
+  return h("div", { class: "process", id: "process-features" },
+    h("h3", {}, "How the code was written"),
+    h("table", { class: "habits" },
+      h("thead", {}, h("tr", {}, h("th", {}, "Process feature"), h("th", {}, "Practice (baseline)"), h("th", {}, "Exam"))),
+      h("tbody", {}, ...PROCESS_LABELS.map(([key, label]) => h("tr", { "data-feature": key },
+        h("td", {}, label), h("td", {}, fmt(p.baseline?.[key], 2)), h("td", {}, fmt(p.exam[key], 2)))))),
+    h("p", { class: "muted" }, "Context only, with no thresholds. Practice was copy-typing, so the exam usually has more pauses, ",
+      "corrections and jumps between lines. What counts as unusual needs each feature's normal spread from study data. – means not enough input."),
+  );
+}
+
 function examSection(ex: ExamReport, replayLink?: (sessionId: string) => string, reviewExtra?: (ex: ExamReport) => Node | null): HTMLElement {
   const chart = keystrokeChart(ex);
   return h("section", { class: "exam-report", "data-session": ex.session_id },
@@ -143,6 +173,7 @@ function examSection(ex: ExamReport, replayLink?: (sessionId: string) => string,
         "purple dashes: code structure that arrived without typing.")) : null,
     h("h3", {}, "Typing habits"),
     habitsTable(ex.habits.baseline, ex.habits.exam),
+    ex.process ? processTable(ex.process) : null,
     replayLink ? h("p", {}, h("a", { href: replayLink(ex.session_id) }, "Replay this exam keystroke by keystroke")) : null,
     reviewSection(ex, ex.closed && reviewExtra ? reviewExtra(ex) : null),
   );

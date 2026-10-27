@@ -18,6 +18,9 @@ import numpy as np
 from numpy.typing import NDArray
 
 from integrity_ml.ast_features import ast_timeline
+from integrity_ml.process_features import FEATURES as PROCESS_FEATURES
+from integrity_ml.process_features import ProcessConfig, process_features, vector
+from integrity_ml.process_features import baseline as process_baseline
 from integrity_ml.session_features import Habits, enrollment_windows, exam_windows, session_signals
 
 FALSE_FLAG_NOTE = (
@@ -70,7 +73,7 @@ def _mean_habits(items: Sequence[Habits]) -> dict[str, Any]:
 def build_report(pseudonym: str, sessions: Sequence[SessionEvents], model: Model | None, model_note: str,
                  cfg: Mapping[str, Any]) -> dict[str, Any]:
     """cfg: {"report": scoring.report, "m", "stride", "clip_s", "g_min", "large_insert_chars", "coupling_s",
-    "ast": features.ast}."""
+    "ast": features.ast, "process": features.process}."""
     rules = cfg["report"]
     # Stages (D-038): practice tasks build the baseline; the check task is held out and tested against it.
     practice = [s for s in sessions if s["kind"] == "practice" and s["closed"] and s.get("stage", "baseline") == "baseline"]
@@ -82,7 +85,10 @@ def build_report(pseudonym: str, sessions: Sequence[SessionEvents], model: Model
     # ---- baseline from the closed practice sessions
     windows: list[NDArray[np.float32]] = []
     practice_rows, practice_habits = [], []
+    pcfg = ProcessConfig.from_config(cfg["process"])
+    practice_process = []
     for s in practice:
+        practice_process.append(vector(process_features(s["events"], pcfg)))      # whole module (SPEC 6.2)
         sig = session_signals(s["events"], cfg["large_insert_chars"], cfg["coupling_s"])
         w = enrollment_windows(sig.keystrokes, cfg["m"], cfg["clip_s"])
         windows += w
@@ -95,6 +101,7 @@ def build_report(pseudonym: str, sessions: Sequence[SessionEvents], model: Model
     baseline = {
         "status": baseline_status, "practice_sessions": practice_rows, "windows": len(windows),
         "windows_needed": cfg["g_min"], "habits": _mean_habits(practice_habits) if practice_habits else None,
+        "process": _process_dict(process_baseline(practice_process)) if practice_process else None,
         "note": TRANSCRIPTION_NOTE,
     }
     baseline["check"] = _check_report(checks, model, prototype, len(windows), cfg, rules)
@@ -114,6 +121,10 @@ def build_report(pseudonym: str, sessions: Sequence[SessionEvents], model: Model
         "no_score_note": "No single integrity score is shown: it needs a fusion model fitted on labelled study data (P3, after data collection).",
         "false_flag_note": FALSE_FLAG_NOTE,
     }
+
+
+def _process_dict(v: NDArray[np.float64]) -> dict[str, float | None]:
+    return {k: None if np.isnan(x) else round(float(x), 3) for k, x in zip(PROCESS_FEATURES, v)}
 
 
 def _distances(model: Model, prototype: NDArray[np.float32], windows: Sequence[NDArray[np.float32]]) -> NDArray[np.float64]:
@@ -263,6 +274,9 @@ def _exam_report(s: SessionEvents, model: Model | None, prototype: NDArray[np.fl
         "reasons": [f"{f['title']}: {f['detail']}" for f in flags],
         "findings": findings, "keystroke": keystroke,
         "habits": {"exam": _habits_dict(hab), "baseline": baseline["habits"]},
+        # SPEC 6.2, whole exam vs the practice mean. No distance or flag: the scales s_k need study data.
+        "process": {"exam": _process_dict(vector(process_features(s["events"], ProcessConfig.from_config(cfg["process"])))),
+                    "baseline": baseline["process"]},
         "pastes": [{"t": round(p.t - t0, 1), "chars": p.chars, "provenance": p.provenance} for p in ins.pastes],
         "ast_jumps": [{"t": round(j.t - t0, 1), "added_nodes": j.added_nodes, "keydowns": j.keydowns} for j in tl.jumps],
     }

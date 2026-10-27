@@ -118,6 +118,7 @@ def report_config() -> dict[str, Any]:
         "large_insert_chars": int(capture["snapshot"]["large_insert_min_chars"]),
         "coupling_s": float(features["clipboard"]["focus_paste_coupling_s"]),
         "ast": features["ast"],
+        "process": features["process"],
     }
 
 
@@ -145,7 +146,9 @@ def redact_for_participant(report: dict[str, Any]) -> dict[str, Any]:
     check = {k: v for k, v in check.items() if k not in NUMERIC_DETECTION_FIELDS}
     check["detail"] = CHECK_TEXT.get(check.get("status", ""), check.get("detail", ""))
     report["baseline"]["check"] = check
+    report["baseline"].pop("process", None)       # a feature-by-feature comparison would be a guide to imitating the baseline
     for exam in report["exams"]:
+        exam.pop("process", None)
         exam["keystroke"] = {"available": False, "redacted": bool(exam["keystroke"].get("available"))}
         for f in exam["findings"]:
             f["detail"] = PARTICIPANT_TEXT.get((f["id"], f["status"]), f["detail"])

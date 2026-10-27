@@ -14,8 +14,10 @@ from integrity_backend.report import build_report
 from integrity_backend.settings import REPO_ROOT
 
 RULES = yaml.safe_load((REPO_ROOT / "config" / "scoring.yaml").read_text(encoding="utf-8"))["report"]
-AST = yaml.safe_load((REPO_ROOT / "config" / "features.yaml").read_text(encoding="utf-8"))["ast"]
-CFG = {"report": RULES, "m": 70, "stride": 35, "clip_s": 1.5, "g_min": 5, "large_insert_chars": 32, "coupling_s": 10.0, "ast": AST}
+FEATURES_CFG = yaml.safe_load((REPO_ROOT / "config" / "features.yaml").read_text(encoding="utf-8"))
+AST = FEATURES_CFG["ast"]
+CFG = {"report": RULES, "m": 70, "stride": 35, "clip_s": 1.5, "g_min": 5, "large_insert_chars": 32, "coupling_s": 10.0,
+       "ast": AST, "process": FEATURES_CFG["process"]}
 
 
 @dataclass
@@ -39,9 +41,18 @@ class Log:
     def __init__(self) -> None:
         self.events: list[dict[str, Any]] = []
         self.t = 1_000_000
+        self.pos = 0                      # end of the document: every insertion goes there
 
     def add(self, etype: str, data: dict[str, Any], t: int | None = None) -> None:
         self.events.append({"type": etype, "t_client_us": self.t if t is None else t, "data": data})
+
+    def change(self, text: str, cause: str) -> dict[str, Any]:
+        """A schema-complete content_change inserting text at the end."""
+        d = {"version_id": len(self.events), "idx": 0, "n": 1, "offset": self.pos, "del_len": 0, "ins_len": len(text),
+             "text": text, "start_line": 1, "start_col": self.pos + 1, "end_line": 1, "end_col": self.pos + 1,
+             "cause": cause, "undo": False, "redo": False, "flush": False}
+        self.pos += len(text)
+        return d
 
     def type(self, n: int, gap_ms: float, hold_ms: float = 80, jitter: float = 0.3, seed: int = 0) -> "Log":
         rng = np.random.default_rng(seed)
@@ -49,7 +60,7 @@ class Log:
             self.t += int(gap_ms * 1000 * (1 + jitter * rng.uniform(-1, 1)))
             key = {"code": "KeyA" if i % 2 else "KeyS", "cat": "letter", "rep": False, "mods": 0, "target": "editor"}
             self.add("keydown", key)
-            self.add("content_change", {"ins_len": 1, "text": "a", "cause": "typed", "flush": False}, self.t + 300)
+            self.add("content_change", self.change("a", "typed"), self.t + 300)
             self.add("keyup", key, self.t + int(hold_ms * 1000))
         return self
 
@@ -60,7 +71,7 @@ class Log:
             self.add("focus", {"target": "window"})
         self.t += 2_000_000
         self.add("paste", {"len": len(text)})
-        self.add("content_change", {"ins_len": len(text), "text": text, "cause": "paste", "flush": False})
+        self.add("content_change", self.change(text, "paste"))
         return self
 
 
@@ -223,3 +234,13 @@ def test_code_structure_without_typing_is_shown_as_evidence_not_a_flag() -> None
     assert jump["keydowns"] == 0 and jump["added_nodes"] >= AST["jump_min_nodes"] and jump["t"] > 0
     plain = build_report("DEV-AST2", practice() + [session("exam", Log().type(210, 180, seed=9), "e")], FakeModel(), "", CFG)
     assert finding(plain, "ast_jump")["detail"] == "None." and plain["exams"][0]["ast_jumps"] == []
+
+
+def test_process_features_for_the_exam_and_the_practice_baseline() -> None:
+    r = build_report("DEV-PROC", practice() + [session("exam", Log().type(210, 180, seed=9), "e")], FakeModel(), "", CFG)
+    proc = r["exams"][0]["process"]
+    assert set(proc["exam"]) == set(proc["baseline"]) and len(proc["exam"]) == 14
+    assert proc["exam"]["linearity"] == 1.0 and proc["baseline"]["linearity"] == 1.0     # typed at the end throughout
+    assert proc["exam"]["revision_rate"] == 0.0 and proc["exam"]["pause_frac_2s"] == 0.0
+    assert r["baseline"]["process"] == proc["baseline"]
+    assert not any(f["id"].startswith("process") for f in r["exams"][0]["findings"])      # no flag: scales need study data

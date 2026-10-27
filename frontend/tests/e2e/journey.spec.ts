@@ -89,6 +89,7 @@ test("practice builds a baseline, the exam is checked, the report and dashboard 
   await expect(page.locator("#baseline-check")).toContainText(/Baseline check: (confirmed|does not match|could not run)/);
   const ks = page.locator('[data-finding="keystroke"]');
   await expect(page.locator(".ks-chart")).toHaveCount(0);              // participants never see distances or thresholds
+  await expect(page.locator("#process-features")).toHaveCount(0);      // nor the feature-by-feature process comparison
   const modelRan = (await page.locator("#distances-redacted").count()) > 0;
   if (modelRan) {
     await expect(ks).toHaveClass(/finding-(ok|flag)/);                  // model installed: compared to the baseline
@@ -116,6 +117,7 @@ test("practice builds a baseline, the exam is checked, the report and dashboard 
   await expect(page.locator("#report a[href^='#/replay?session=']")).toHaveCount(1);
   await expect(page.locator(".ks-chart")).toHaveCount(modelRan ? 1 : 0);   // reviewers do see the distances
   await expect(page.locator('[data-finding="ast_jump"]')).toHaveClass(/finding-info/);   // AST evidence, never a flag (SPEC 6.3)
+  await expect(page.locator('#process-features tr[data-feature="linearity"]')).toBeVisible();   // SPEC 6.2, reviewers only
 
   // The reviewer reads the participant's note and records a decision with notes (D-039).
   await expect(review.locator(".appeal")).toContainText(note);
