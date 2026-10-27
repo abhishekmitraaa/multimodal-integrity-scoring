@@ -344,6 +344,7 @@ button.task-done {
 .ks-chart .line-threshold { stroke: var(--fg); stroke-dasharray: 5 4; }
 .ks-chart .mark-external { stroke: var(--error); stroke-width: 2; }
 .ks-chart .mark-internal { stroke: var(--accent); stroke-width: 2; }
+.ks-chart .mark-ast { stroke: #8a4fd8; stroke-width: 2; stroke-dasharray: 3 3; }
 
 .habits {
   border-collapse: collapse;

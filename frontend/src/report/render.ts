@@ -63,6 +63,9 @@ function keystrokeChart(ex: ExamReport): Element | null {
   for (const p of ex.pastes) {
     root.append(svg("line", { x1: x(p.t), x2: x(p.t), y1: T, y2: H - B, class: p.provenance === "external" ? "mark-external" : "mark-internal" }));
   }
+  for (const j of ex.ast_jumps ?? []) {
+    root.append(svg("line", { x1: x(j.t), x2: x(j.t), y1: T, y2: H - B, class: "mark-ast" }));
+  }
   root.append(svg("line", { x1: L, x2: W - R, y1: y(k.population_threshold), y2: y(k.population_threshold), class: "line-threshold" }));
   root.append(svg("text", { x: L + 4, y: y(k.population_threshold) - 4, class: "tick" }, "same-person 95% (reference data)"));
   if (k.personal_threshold !== null && k.personal_threshold > k.population_threshold) {
@@ -136,7 +139,8 @@ function examSection(ex: ExamReport, replayLink?: (sessionId: string) => string,
         "Each dot is a window of 70 key presses: its distance from this person's practice typing (lower = more alike). ",
         "Dashed line: 95% of same-person comparisons in the reference data. Dotted line, when shown: this person's own ",
         "normal range from the baseline check; the higher of the two is used. ",
-        "Red lines: pastes from outside the editor; blue: pastes from inside it.")) : null,
+        "Red lines: pastes from outside the editor; blue: pastes from inside it; ",
+        "purple dashes: code structure that arrived without typing.")) : null,
     h("h3", {}, "Typing habits"),
     habitsTable(ex.habits.baseline, ex.habits.exam),
     replayLink ? h("p", {}, h("a", { href: replayLink(ex.session_id) }, "Replay this exam keystroke by keystroke")) : null,

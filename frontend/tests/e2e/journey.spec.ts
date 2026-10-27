@@ -115,6 +115,7 @@ test("practice builds a baseline, the exam is checked, the report and dashboard 
   await expect(page.locator("#overall-verdict")).toContainText("Review recommended", { timeout: 60_000 });
   await expect(page.locator("#report a[href^='#/replay?session=']")).toHaveCount(1);
   await expect(page.locator(".ks-chart")).toHaveCount(modelRan ? 1 : 0);   // reviewers do see the distances
+  await expect(page.locator('[data-finding="ast_jump"]')).toHaveClass(/finding-info/);   // AST evidence, never a flag (SPEC 6.3)
 
   // The reviewer reads the participant's note and records a decision with notes (D-039).
   await expect(review.locator(".appeal")).toContainText(note);

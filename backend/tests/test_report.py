@@ -14,7 +14,8 @@ from integrity_backend.report import build_report
 from integrity_backend.settings import REPO_ROOT
 
 RULES = yaml.safe_load((REPO_ROOT / "config" / "scoring.yaml").read_text(encoding="utf-8"))["report"]
-CFG = {"report": RULES, "m": 70, "stride": 35, "clip_s": 1.5, "g_min": 5, "large_insert_chars": 32, "coupling_s": 10.0}
+AST = yaml.safe_load((REPO_ROOT / "config" / "features.yaml").read_text(encoding="utf-8"))["ast"]
+CFG = {"report": RULES, "m": 70, "stride": 35, "clip_s": 1.5, "g_min": 5, "large_insert_chars": 32, "coupling_s": 10.0, "ast": AST}
 
 
 @dataclass
@@ -203,3 +204,22 @@ def test_a_check_taken_after_the_exam_started_does_not_count_and_only_the_first_
     retake = {**check(Log().type(140, 180, seed=22), "retake"), "closed_at": 20.0}
     r = build_report("DEV-C7", practice() + [first, retake], FakeModel(), "", CFG)
     assert r["baseline"]["check"]["status"] == "not_confirmed"              # a retake cannot replace the first check
+
+
+def test_code_structure_without_typing_is_shown_as_evidence_not_a_flag() -> None:
+    small = "def rle(s):\n    return s\n"
+    big = small + "".join(f"\ndef g{i}(a, b):\n    if a > b:\n        return [a, b]\n    return (b, a)\n" for i in range(4))
+    log = Log()
+    log.add("snapshot", {"text": small, "reason": "segment_start"})
+    log.type(210, 180, seed=9)
+    log.add("snapshot", {"text": small, "reason": "timer"})
+    log.t += 5_000_000
+    log.add("snapshot", {"text": big, "reason": "large_insert"})       # appears with no key presses in between
+    r = build_report("DEV-AST", practice() + [session("exam", log, "e")], FakeModel(), "", CFG)
+    f = finding(r, "ast_jump")
+    assert f["status"] == "info" and f["detail"].startswith("1 time(s)")
+    assert exam_state(r) == "no_review_flags"                          # evidence for the reviewer, never a flag by itself
+    jump = r["exams"][0]["ast_jumps"][0]
+    assert jump["keydowns"] == 0 and jump["added_nodes"] >= AST["jump_min_nodes"] and jump["t"] > 0
+    plain = build_report("DEV-AST2", practice() + [session("exam", Log().type(210, 180, seed=9), "e")], FakeModel(), "", CFG)
+    assert finding(plain, "ast_jump")["detail"] == "None." and plain["exams"][0]["ast_jumps"] == []

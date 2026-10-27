@@ -21,6 +21,8 @@ ast:
   min_named_nodes: 50
   jump_min_nodes: 30
   jump_max_keydowns: 30
+  identifier_stats: distinct      # [PROPOSED] identifier length/1-char share over distinct names, not occurrences
+  max_snapshots: 2000             # [PROPOSED] bound on snapshots parsed per session; truncation is reported
 clipboard:
   horizon_s: 120
   focus_paste_coupling_s: 10

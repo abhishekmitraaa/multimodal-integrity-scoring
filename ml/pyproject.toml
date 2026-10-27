@@ -7,7 +7,8 @@ name = "integrity-ml"
 version = "0.0.1"
 requires-python = ">=3.11,<3.12"
 # Dependencies are added in the phase that first uses them, together with tests.
-dependencies = ["numpy>=1.26", "scipy>=1.11", "scikit-learn>=1.4"]
+# AST features (SPEC 6.3): parser and grammar pinned exactly; grammar_info() records the hashes.
+dependencies = ["numpy>=1.26", "scipy>=1.11", "scikit-learn>=1.4", "tree-sitter==0.25.2", "tree-sitter-python==0.25.0"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]

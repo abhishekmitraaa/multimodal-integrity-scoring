@@ -127,6 +127,7 @@ export interface ExamReport {
   };
   habits: { exam: HabitValues | null; baseline: HabitValues | null };
   pastes: Array<{ t: number; chars: number; provenance: string }>;
+  ast_jumps?: Array<{ t: number; added_nodes: number; keydowns: number }>;
   decisions?: Decision[];
   appeals?: Appeal[];
 }

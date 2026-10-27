@@ -574,6 +574,14 @@ syntax errors: `ERROR` nodes are counted and kept.
 With only 2–3 practice problems, $B_u$ is noisy. That is why AST drift is a weak, fusion-only
 signal.
 
+**Built (D-040, 2026-10-27):** `ml/src/integrity_ml/ast_features.py`, tree-sitter 0.25.2 with
+tree-sitter-python 0.25.0, pinned; $|V|$ = 124 (123 named types + `ERROR`). `grammar_info()` records
+the versions and the vocabulary and grammar-binary hashes. Identifier statistics use distinct names. AST jumps are
+computed from the client's `snapshot` events, at most `features.ast.max_snapshots` per session
+(truncation is reported). The exam report shows AST jumps as information, not a flag. Drift is
+computed by the module but not shown: it needs per-problem references $R_p$ from training-fold
+users, and exam problems have no author solution on the server (D-035).
+
 ### 6.4 Clipboard features [BRIEF]
 
 - **Paste provenance** (server-computed). A paste is `internal` if its normalised SHA-256 matches a

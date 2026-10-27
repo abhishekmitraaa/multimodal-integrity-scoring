@@ -17,6 +17,7 @@ from typing import Any, Mapping, Protocol, Sequence
 import numpy as np
 from numpy.typing import NDArray
 
+from integrity_ml.ast_features import ast_timeline
 from integrity_ml.session_features import Habits, enrollment_windows, exam_windows, session_signals
 
 FALSE_FLAG_NOTE = (
@@ -68,7 +69,8 @@ def _mean_habits(items: Sequence[Habits]) -> dict[str, Any]:
 
 def build_report(pseudonym: str, sessions: Sequence[SessionEvents], model: Model | None, model_note: str,
                  cfg: Mapping[str, Any]) -> dict[str, Any]:
-    """cfg: {"report": scoring.report, "m", "stride", "clip_s", "g_min", "large_insert_chars", "coupling_s"}."""
+    """cfg: {"report": scoring.report, "m", "stride", "clip_s", "g_min", "large_insert_chars", "coupling_s",
+    "ast": features.ast}."""
     rules = cfg["report"]
     # Stages (D-038): practice tasks build the baseline; the check task is held out and tested against it.
     practice = [s for s in sessions if s["kind"] == "practice" and s["closed"] and s.get("stage", "baseline") == "baseline"]
@@ -241,6 +243,15 @@ def _exam_report(s: SessionEvents, model: Model | None, prototype: NDArray[np.fl
                                  if machine else f"Key-interval spread {hab.interval_cv:.2f}: the normal unevenness of human typing (an auto-typer is near 0)."))
     # 7. Context only, never a flag by itself
     findings.append(_finding("away", "info", "Time away from the window", f"{round(ins.away_seconds)} s with the browser window out of focus."))
+    # 8. AST jumps (SPEC 6.3): dashboard evidence, not a flag (pastes and unexplained inserts behind them are rules 2-5)
+    a = cfg["ast"]
+    tl = ast_timeline(s["events"], int(a["jump_min_nodes"]), int(a["jump_max_keydowns"]), int(a["max_snapshots"]))
+    at = ", ".join(f"{int((j.t - t0) // 60)}:{int((j.t - t0) % 60):02d}" for j in tl.jumps)
+    findings.append(_finding(
+        "ast_jump", "info", "Code structure that arrived without typing",
+        (f"{len(tl.jumps)} time(s) at least {a['jump_min_nodes']} pieces of code structure appeared between two snapshots "
+         f"with fewer than {a['jump_max_keydowns']} key presses (at {at})." if tl.jumps else "None.")
+        + (f" Only the first {tl.snapshots} snapshots were checked." if tl.truncated else "")))
 
     flags = [f for f in findings if f["status"] == "flag"]
     keystroke_unavailable = any(f["id"] == "keystroke" and f["status"] == "unavailable" for f in findings)
@@ -252,4 +263,5 @@ def _exam_report(s: SessionEvents, model: Model | None, prototype: NDArray[np.fl
         "findings": findings, "keystroke": keystroke,
         "habits": {"exam": _habits_dict(hab), "baseline": baseline["habits"]},
         "pastes": [{"t": round(p.t - t0, 1), "chars": p.chars, "provenance": p.provenance} for p in ins.pastes],
+        "ast_jumps": [{"t": round(j.t - t0, 1), "added_nodes": j.added_nodes, "keydowns": j.keydowns} for j in tl.jumps],
     }

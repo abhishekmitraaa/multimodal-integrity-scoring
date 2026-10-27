@@ -116,6 +116,7 @@ def report_config() -> dict[str, Any]:
         "g_min": int(models["enrollment"]["g_min"]),
         "large_insert_chars": int(capture["snapshot"]["large_insert_min_chars"]),
         "coupling_s": float(features["clipboard"]["focus_paste_coupling_s"]),
+        "ast": features["ast"],
     }
 
 

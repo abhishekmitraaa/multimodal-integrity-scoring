@@ -73,6 +73,20 @@ The first part of P4, built after "continue".
   access log, which admins open from the dashboard (reviewers can't). Erasure removes all of it.
 - The dashboard list has a **Decision** column ("Not reviewed" until someone decides).
 
+## Addition: AST features and the hash-chain check (D-040, D-041, 2026-10-27)
+
+- **AST features (SPEC 6.3)** in `ml/src/integrity_ml/ast_features.py`: tree-sitter parsing that
+  tolerates syntax errors, the smoothed node histogram, the problem "tilt", JSD drift, four style
+  scalars, availability, and AST jumps. Versions are pinned and hashes recorded. 11 unit tests on hand-written
+  programs with known answers.
+- **In the report:** "Code structure that arrived without typing" (AST jumps) as information, with
+  purple markers on the reviewer's chart. Not a flag on its own.
+- **Not shown:** AST drift. It is a weak, fusion-only signal, and it needs per-problem references
+  from study data. Finding from the tests: on short programs it is small even between clearly
+  different styles (about 0.04).
+- **Decision panel:** the exam's hash-chain check, with the caveat that it shows tampering after
+  the server received the data, not what the browser sent.
+
 ## How it's built
 
 | Part | Where |
@@ -122,7 +136,8 @@ scope (D-025); this stays an open question.
    from copying shown code (D-035), so genuine composing may sit further from it.
    **Expect false flags on the typing check** until P3 measures this.
 3. **The baseline is small:** about 4–6 windows from three short tasks.
-4. **No fused score and no AST features yet.** Decisions and student notes now exist (D-039),
+4. **No fused score yet**, and AST drift is computed but unused until study data gives per-problem
+   references. Decisions and student notes now exist (D-039),
    but there is one shared reviewer token, so "who decided" is the role ("reviewer-1"), not a
    named person. Named reviewer accounts are needed before reviewers outside the team (Q4).
 5. **Report endpoints are not rate-limited.** That's fine on one laptop, but needed before any
