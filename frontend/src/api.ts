@@ -67,6 +67,7 @@ export const api = {
   appeal: (sessionId: string, note: string, participantToken: string) =>
     call<{ id: number; at: string }>("/api/me/appeals", { method: "POST", body: JSON.stringify({ session_id: sessionId, note }) }, participantToken),
   staff: {
+    me: (token: string) => call<{ handle: string; role: string; shared: "true" | "false" }>("/api/staff/me", {}, token),
     participants: (token: string) => call<ParticipantSummary[]>("/api/participants", {}, token),
     report: (pseudonym: string, token: string) => call<Report>(`/api/participants/${encodeURIComponent(pseudonym)}/report`, {}, token),
     sessions: (token: string) => call<Array<Record<string, unknown>>>("/api/sessions", {}, token),

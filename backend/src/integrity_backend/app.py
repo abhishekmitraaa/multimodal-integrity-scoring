@@ -226,11 +226,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def store() -> Store:
         return app.state.store  # type: ignore[no-any-return]
 
-    def staff(authorization: str | None, admin_only: bool = False) -> tuple[str, str]:
+    async def staff(authorization: str | None, admin_only: bool = False) -> tuple[str, str]:
+        """(actor, role). Named accounts (D-044) first; then the bootstrap admin token from the secrets
+        folder; then the shared reviewer token, only while privacy.staff.shared_reviewer_token is on."""
         token = _bearer(authorization)
+        account = await store().staff_by_token(token)
+        if account is not None and (account[1] == "admin" or not admin_only):
+            return account
         if hmac.compare_digest(token, settings.admin_token):
             return "admin", "admin"
-        if not admin_only and hmac.compare_digest(token, settings.reviewer_token):
+        if (not admin_only and settings.privacy.get("staff", {}).get("shared_reviewer_token", False)
+                and hmac.compare_digest(token, settings.reviewer_token)):
             return "reviewer-1", "reviewer"
         raise HTTPException(403, "not authorised")
 
@@ -322,13 +328,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/api/sessions")
     async def list_sessions(authorization: str | None = Header(None)) -> list[dict[str, Any]]:
-        actor, role = staff(authorization)
+        actor, role = await staff(authorization)
         await store().log_access(actor, role, "list_sessions", "*")
         return await store().list_sessions()
 
+    @app.get("/api/staff/me")
+    async def staff_me(authorization: str | None = Header(None)) -> dict[str, str]:
+        """Who this token belongs to, so the dashboard can show it."""
+        actor, role = await staff(authorization)
+        return {"handle": actor, "role": role, "shared": str(actor == "reviewer-1").lower()}
+
     @app.get("/api/participants")
     async def list_participants(authorization: str | None = Header(None)) -> list[dict[str, Any]]:
-        actor, role = staff(authorization)
+        actor, role = await staff(authorization)
         await store().log_access(actor, role, "list_participants", "*")
         participants = await store().list_participants()
         decisions = await store().latest_decisions()
@@ -340,7 +352,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/api/participants/{pseudonym}/report")
     async def staff_report(pseudonym: str, authorization: str | None = Header(None)) -> dict[str, Any]:
-        actor, role = staff(authorization)
+        actor, role = await staff(authorization)
         # Logged first and atomically with erasure: an erased pseudonym never comes back into the log.
         if not await store().log_access_about(actor, role, "read_report", pseudonym=pseudonym):
             raise HTTPException(404, "unknown participant")
@@ -350,7 +362,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def record_decision(session_id: str, body: DecisionIn, authorization: str | None = Header(None)) -> dict[str, Any]:
         """A reviewer's decision on a submitted exam (D-039). Append-only: a new decision supersedes
         the previous one, and both stay in the history."""
-        actor, role = staff(authorization)
+        actor, role = await staff(authorization)
         session = await store().get_session(session_id)
         if session is None:
             raise HTTPException(404, "unknown session")
@@ -407,7 +419,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/api/sessions/{session_id}/events")
     async def session_events(session_id: str, authorization: str | None = Header(None)) -> dict[str, Any]:
-        actor, role = staff(authorization)
+        actor, role = await staff(authorization)
         session_id = Store.canonical(session_id)
         if not await store().log_access_about(actor, role, "read_events", session_id=session_id):
             raise HTTPException(404, "unknown session")
@@ -416,7 +428,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/api/sessions/{session_id}/replay")
     async def session_replay(session_id: str, upto: int | None = None, authorization: str | None = Header(None)) -> dict[str, Any]:
-        actor, role = staff(authorization)
+        actor, role = await staff(authorization)
         session_id = Store.canonical(session_id)
         if not await store().log_access_about(actor, role, "replay", session_id=session_id):
             raise HTTPException(404, "unknown session")
@@ -433,7 +445,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/api/sessions/{session_id}/verify")
     async def session_verify(session_id: str, authorization: str | None = Header(None)) -> dict[str, Any]:
-        actor, role = staff(authorization)
+        actor, role = await staff(authorization)
         session_id = Store.canonical(session_id)
         if not await store().log_access_about(actor, role, "verify_chain", session_id=session_id):
             raise HTTPException(404, "unknown session")
@@ -446,13 +458,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/api/access-log")
     async def access_log(authorization: str | None = Header(None)) -> list[dict[str, Any]]:
-        actor, role = staff(authorization, admin_only=True)
+        actor, role = await staff(authorization, admin_only=True)
         await store().log_access(actor, role, "read_access_log", "*")
         return await store().access_log()
 
     @app.delete("/api/participants/{pseudonym}")
     async def erase(pseudonym: str, authorization: str | None = Header(None)) -> dict[str, Any]:
-        actor, role = staff(authorization, admin_only=True)
+        actor, role = await staff(authorization, admin_only=True)
         try:
             n_sessions, n_events = await store().erase_participant(pseudonym, actor)
         except KeyError as exc:

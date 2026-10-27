@@ -69,9 +69,10 @@ function decisionForm(ex: ExamReport, token: () => string, reopen: () => Promise
 }
 
 export function dashboardPage(root: HTMLElement, params: URLSearchParams): void {
-  const tokenInput = h("input", { type: "password", id: "dash-token", placeholder: "Reviewer token", size: 40 }) as HTMLInputElement;
+  const tokenInput = h("input", { type: "password", id: "dash-token", placeholder: "Your reviewer token", size: 40 }) as HTMLInputElement;
   tokenInput.value = store.staffToken() ?? "";
   const error = h("p", { class: "error", id: "dash-error" });
+  const who = h("p", { class: "muted", id: "dash-who" });
   const list = h("section", { id: "dash-list" });
   const detail = h("section", { id: "dash-report" });
   const audit = h("section", { id: "dash-audit" });
@@ -117,6 +118,10 @@ export function dashboardPage(root: HTMLElement, params: URLSearchParams): void 
     store.setStaffToken(tokenInput.value);
     error.textContent = "";
     try {
+      const me = await api.staff.me(tokenInput.value);
+      who.textContent = me.shared === "true"
+        ? `Signed in with the shared development token: decisions are recorded as "${me.handle}", not a named person.`
+        : `Signed in as ${me.handle} (${me.role}). Your decisions are recorded under this name.`;
       await loadList(true);
     } catch (err) {
       error.textContent = String(err);
@@ -149,7 +154,7 @@ export function dashboardPage(root: HTMLElement, params: URLSearchParams): void 
       h("div", { class: "row" }, tokenInput,
         h("button", { id: "dash-load", class: "primary", onclick: () => void load() }, "Load participants"),
         h("button", { id: "dash-audit-load", onclick: () => void loadAudit() }, "Access log (admin)")),
-      error, list, detail, audit,
+      who, error, list, detail, audit,
     ),
   );
   if (tokenInput.value) void load();

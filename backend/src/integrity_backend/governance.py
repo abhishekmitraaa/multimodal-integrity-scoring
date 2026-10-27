@@ -49,6 +49,9 @@ def validate(privacy: Mapping[str, Any]) -> None:
     if privacy.get("real_collection_enabled") and missing(privacy):
         raise GovernanceError("real_collection_enabled needs every governance value in config/privacy.yaml; "
                               f"missing: {', '.join(missing(privacy))}")
+    if privacy.get("real_collection_enabled") and (privacy.get("staff") or {}).get("shared_reviewer_token", False):
+        raise GovernanceError("real_collection_enabled needs staff.shared_reviewer_token: false, so every "
+                              "decision names a person (D-044); create accounts with scripts/staff_accounts.py")
 
 
 def purge_dates(privacy: Mapping[str, Any]) -> tuple[dt.date, dt.date] | None:

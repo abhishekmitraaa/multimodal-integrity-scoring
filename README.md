@@ -97,6 +97,9 @@ everything, press Ctrl+C and close the backend window.
 | Reviewer replay (token in `~/.integrity-exam/secrets/reviewer_token.txt`) | http://127.0.0.1:5173/#/replay | yes |
 | A participant's own report and notes for the reviewer (after submitting the exam) | http://127.0.0.1:5173/#/my-report | yes |
 
+Reviewer accounts: `python scripts/staff_accounts.py add <handle> --role reviewer` (prints the
+token once), `list`, `disable <handle>`.
+
 Participants can withdraw on the tasks page (all their data is erased). The retention job is
 `python scripts/purge_retention.py` (dry run; `--apply` to erase), using the dates in
 `config/privacy.yaml → governance`.

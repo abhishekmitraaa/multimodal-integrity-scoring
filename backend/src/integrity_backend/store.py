@@ -66,6 +66,10 @@ class SessionRow:
     epoch: int
 
 
+# Actor names the system writes itself; a staff account cannot take them (D-044).
+RESERVED_HANDLES = frozenset({"admin", "reviewer-1", "participant", "retention-job", "admin-cli"})
+
+
 class SessionLimitError(Exception):
     """The participant already has the one session allowed for this problem."""
 
@@ -104,6 +108,38 @@ class Store:
                 )
             ).first()
         return None if row is None else str(row.pseudonym)
+
+    # ---- named staff accounts (D-044) -------------------------------------------------------
+
+    async def staff_by_token(self, token: str) -> tuple[str, str] | None:
+        """(handle, role) of an enabled staff account, or None."""
+        async with self.engine.connect() as conn:
+            row = (await conn.execute(
+                text("SELECT handle, role FROM staff_accounts WHERE token_sha256 = :t AND disabled_at IS NULL"),
+                {"t": sha256(token)})).first()
+        return None if row is None else (str(row.handle), str(row.role))
+
+    async def create_staff_account(self, handle: str, role: str) -> str:
+        """Returns the new token; only its hash is stored, so it cannot be shown again."""
+        if handle in RESERVED_HANDLES:
+            raise ValueError(f"{handle!r} is reserved")
+        token = secrets.token_urlsafe(32)
+        async with self.engine.begin() as conn:
+            await conn.execute(text("INSERT INTO staff_accounts (handle, role, token_sha256) VALUES (:h, :r, :t)"),
+                               {"h": handle, "r": role, "t": sha256(token)})
+        return token
+
+    async def disable_staff_account(self, handle: str) -> bool:
+        async with self.engine.begin() as conn:
+            n = (await conn.execute(text("UPDATE staff_accounts SET disabled_at = now() WHERE handle = :h AND disabled_at IS NULL"),
+                                    {"h": handle})).rowcount
+        return n == 1
+
+    async def list_staff_accounts(self) -> list[dict[str, Any]]:
+        async with self.engine.connect() as conn:
+            rows = (await conn.execute(text("SELECT handle, role, created_at, disabled_at FROM staff_accounts ORDER BY handle"))).all()
+        return [{"handle": r.handle, "role": r.role, "created_at": r.created_at.isoformat(),
+                 "disabled_at": r.disabled_at.isoformat() if r.disabled_at else None} for r in rows]
 
     async def create_session(self, pseudonym: str, kind: str, problem_id: str,
                              at_most_once_among: Sequence[str] = ()) -> tuple[str, str]:

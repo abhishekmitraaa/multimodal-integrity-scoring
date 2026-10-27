@@ -109,6 +109,7 @@ test("practice builds a baseline, the exam is checked, the report and dashboard 
   await page.goto("/#/dashboard");
   await page.fill("#dash-token", REVIEWER_TOKEN);
   await page.click("#dash-load");
+  await expect(page.locator("#dash-who")).toContainText("shared development token");   // D-044: not a named person
   const row = page.locator(`tr[data-pseudonym="${pseudonym}"]`);
   await expect(row).toContainText("3 practice · check ✓ · 1 exam");
   await expect(row.locator(".decision-cell")).toHaveText("Not reviewed");

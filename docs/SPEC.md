@@ -989,7 +989,8 @@ Shown on the consent screen, the dashboard and in every report:
 
 ### 10.10 Reviewers and appeals
 
-- Reviewers must record a decision (`confirm`, `dismiss`, `inconclusive`) with notes.
+- Reviewers must record a decision (`confirm`, `dismiss`, `inconclusive`) with notes, under their own
+  named account (D-044); the shared development token is refused once real collection is on.
 - Reviewers see the §10.8 text on every case.
 - Participants can view their own case evidence and attach appeal notes.
 - In this research prototype, decisions have **no academic consequence**.

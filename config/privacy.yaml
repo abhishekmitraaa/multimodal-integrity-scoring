@@ -26,4 +26,6 @@ signing:                         # deferred (D-017)
   algorithm: ed25519
   key_file: chain_signing_key.pem
 access_log: true
+staff:                           # D-044: named accounts via scripts/staff_accounts.py
+  shared_reviewer_token: true    # development and tests only; real collection requires false (decisions must name a person)
 roles: [participant, reviewer, researcher, admin]

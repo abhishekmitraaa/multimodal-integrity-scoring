@@ -109,6 +109,14 @@ The first part of P4, built after "continue".
 - With this, every signal the fused score needs exists (keystroke, process, AST, clipboard). The
   fusion itself still waits for labelled study data.
 
+## Addition: named reviewer accounts (D-044, 2026-10-27)
+
+- `python scripts/staff_accounts.py add dr-rao --role reviewer` prints a token once; `list` and
+  `disable` manage accounts. Decisions and the access log show the handle; the dashboard shows who
+  is signed in. A disabled token stops working immediately.
+- The shared development token still works for testing, but the backend refuses to start with
+  real collection on while it is enabled.
+
 ## How it's built
 
 | Part | Where |
@@ -160,8 +168,8 @@ scope (D-025); this stays an open question.
 3. **The baseline is small:** about 4–6 windows from three short tasks.
 4. **No fused score yet**, and AST drift is computed but unused until study data gives per-problem
    references. Decisions and student notes now exist (D-039),
-   but there is one shared reviewer token, so "who decided" is the role ("reviewer-1"), not a
-   named person. Named reviewer accounts are needed before reviewers outside the team (Q4).
+   and decisions are signed by named reviewer accounts (D-044); the shared development token
+   remains for testing and is refused once real collection is switched on.
 5. **Report endpoints are not rate-limited.** That's fine on one laptop, but needed before any
    deployment Reports are rebuilt on every request; with AST parsing, a forged worst-case log costs
    about 3 s per exam (bounded by `features.ast.max_snapshots` and `max_parse_chars`). Cache per

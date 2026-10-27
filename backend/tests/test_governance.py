@@ -34,9 +34,10 @@ def test_the_repo_config_has_blanks_and_collection_off() -> None:
 
 
 def test_real_collection_needs_every_value() -> None:
-    governance.validate(privacy(real_collection_enabled=True))
+    named = {"shared_reviewer_token": False}                            # D-044: real collection needs named accounts
+    governance.validate(privacy(real_collection_enabled=True, staff=named))
     with pytest.raises(governance.GovernanceError, match="contact"):
-        governance.validate(privacy(real_collection_enabled=True, governance={"contact": None}))
+        governance.validate(privacy(real_collection_enabled=True, staff=named, governance={"contact": None}))
     with pytest.raises(governance.GovernanceError, match="whole number"):
         governance.validate(privacy(governance={"derived_retention_days_after_project_end": -1}))
     with pytest.raises(ValueError):
