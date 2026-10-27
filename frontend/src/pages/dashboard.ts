@@ -21,6 +21,22 @@ function decisionCell(p: ParticipantSummary): string {
   return decided.length < exams.length ? `${text} (+${exams.length - decided.length} not reviewed)` : text;
 }
 
+/** The exam's hash-chain check (SPEC 11 decision panel). It shows tampering after the server
+ *  received the events, not forgery in the browser before sending (D-026). */
+function chainStatus(ex: ExamReport, token: string): HTMLElement {
+  const el = h("p", { class: "chain muted", id: `chain-${ex.session_id.slice(0, 8)}` }, "Checking the event log's hash chain…");
+  void api.staff.verify(ex.session_id, token).then(
+    (v) => {
+      el.className = v.ok ? "chain chain-ok" : "chain chain-broken";
+      el.textContent = v.ok
+        ? `Event log intact: hash chain verified over ${v.n_events} events. (This shows changes after the server received them, not what the browser sent.)`
+        : `Event log BROKEN at event ${v.first_bad_index}: ${v.reason}. Do not rely on this exam's evidence; tell the admin.`;
+    },
+    (err) => { el.className = "chain error"; el.textContent = `Could not check the hash chain: ${String(err)}`; },
+  );
+  return el;
+}
+
 /** Decision form under a submitted exam. Notes are required; a new decision supersedes, never edits. */
 function decisionForm(ex: ExamReport, token: () => string, reopen: () => Promise<void>): HTMLElement {
   const short = ex.session_id.slice(0, 8);
@@ -66,10 +82,12 @@ export function dashboardPage(root: HTMLElement, params: URLSearchParams): void 
       const report = await api.staff.report(pseudonym, tokenInput.value);
       detail.replaceChildren(renderReport(report, {
         replayLink: (sid) => `#/replay?session=${sid}`,
-        reviewExtra: (ex) => decisionForm(ex, () => tokenInput.value, async () => {
-          await openReport(pseudonym, false);
-          await loadList(false);
-        }),
+        reviewExtra: (ex) => h("div", {},
+          chainStatus(ex, tokenInput.value),
+          decisionForm(ex, () => tokenInput.value, async () => {
+            await openReport(pseudonym, false);
+            await loadList(false);
+          })),
       }));
       history.replaceState(null, "", `#/dashboard?p=${encodeURIComponent(pseudonym)}`);
       if (scroll) detail.scrollIntoView({ block: "start" });

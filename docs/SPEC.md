@@ -1007,8 +1007,9 @@ Shown on the consent screen, the dashboard and in every report:
   inconclusive) with required notes. The participant list has a Decision column. The participant's
   report shows the outcome and date and lets them add a note. Admins open the access log from the
   dashboard.
-- Not yet built: the $\tilde S(t)$ timeline (needs the fusion model), per-tick evidence, and the chain
-  verification status in the decision panel.
+  The decision panel shows the exam's hash-chain check (it shows tampering after the server received
+  the events, not forgery in the browser; D-026).
+- Not yet built: the $\tilde S(t)$ timeline (needs the fusion model) and per-tick evidence.
 
 The full design follows.
 

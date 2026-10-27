@@ -118,6 +118,8 @@ test("practice builds a baseline, the exam is checked, the report and dashboard 
 
   // The reviewer reads the participant's note and records a decision with notes (D-039).
   await expect(review.locator(".appeal")).toContainText(note);
+  await expect(review.locator(".chain")).toHaveClass(/chain-ok/);        // the decision panel shows the hash-chain check
+  await expect(review.locator(".chain")).toContainText(/verified over \d+ events/);
   await review.locator("select").selectOption("inconclusive");
   await review.locator("textarea").fill("short");
   await review.locator("button.primary").click();

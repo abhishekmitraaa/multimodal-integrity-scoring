@@ -374,3 +374,5 @@ button.task-done {
 .review-form textarea { width: 100%; font: inherit; }
 .review-form button { justify-self: start; }
 .decision-cell { white-space: nowrap; }
+.chain-ok { color: var(--ok); }
+.chain-broken { color: var(--error); font-weight: 600; }
