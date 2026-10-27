@@ -437,14 +437,21 @@ class Store:
                     {"p": pseudonym},
                 )
             ).one()
+            session_ids = [str(r.session_id) for r in (await conn.execute(
+                text("SELECT session_id FROM sessions WHERE pseudonym = :p"), {"p": pseudonym})).all()]
             deleted = (await conn.execute(text("DELETE FROM participants WHERE pseudonym = :p"), {"p": pseudonym})).rowcount
             if deleted == 0:
                 raise KeyError(pseudonym)
+            # The audit trail keeps when / role / action, but not this participant's identifiers (migration 0003).
+            await conn.execute(text("UPDATE access_log SET actor = '[erased]' WHERE actor = :p"), {"p": pseudonym})
+            await conn.execute(text("UPDATE access_log SET target = '[erased]' WHERE target = :p OR target = ANY(:sids)"),
+                               {"p": pseudonym, "sids": session_ids})
             await conn.execute(
                 text(
-                    "INSERT INTO erasure_log (pseudonym_sha256, requested_at, actor, n_sessions, n_events) "
+                    "INSERT INTO erasure_log (pseudonym_ref, requested_at, actor, n_sessions, n_events) "
                     "VALUES (:h, :r, :a, :s, :e)"
                 ),
-                {"h": sha256(pseudonym).hex(), "r": requested, "a": actor, "s": counts.n_sessions, "e": counts.n_events},
+                {"h": self.cipher.keyed_ref(b"erasure-tombstone", pseudonym), "r": requested, "a": actor,
+                 "s": counts.n_sessions, "e": counts.n_events},
             )
         return int(counts.n_sessions), int(counts.n_events)

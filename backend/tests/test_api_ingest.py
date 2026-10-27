@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import asyncio
 import json
 import time
@@ -340,7 +341,10 @@ def test_erasure_deletes_everything_and_leaves_tombstone(client: Any, db_url: st
     uid = uuid.UUID(sid)
     assert _run(db_url, "SELECT count(*) AS n FROM events WHERE session_id = $1", uid)[0]["n"] == 0
     assert _run(db_url, "SELECT count(*) AS n FROM participants WHERE pseudonym = $1", pseudonym)[0]["n"] == 0
-    tomb = _run(db_url, "SELECT pseudonym_sha256, n_events FROM erasure_log")
+    tomb = _run(db_url, "SELECT pseudonym_ref, n_events FROM erasure_log")
     assert any(row["n_events"] > 0 for row in tomb)
     assert all(pseudonym not in str(dict(row)) for row in tomb)
+    assert hashlib.sha256(pseudonym.encode()).hexdigest() not in {row["pseudonym_ref"] for row in tomb}   # keyed, not a bare hash
+    log = client.get("/api/access-log", headers=ADMIN).json()
+    assert not any(pseudonym in (e["actor"], e["target"]) or sid in (e["actor"], e["target"]) for e in log)
     assert client.delete(f"/api/participants/{pseudonym}", headers=REVIEWER).status_code == 403

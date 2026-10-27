@@ -954,7 +954,9 @@ same information as the code itself, and it is disclosed in the notice.
 - **Erasure endpoint.** `DELETE /api/participants/{pseudonym}`, callable by the participant (with
   their token) or by an admin (with a request id). It deletes events, snapshots, features, scores,
   cases, notes, appeals and consent choices, and writes an `erasure_log` tombstone with no personal
-  data. The custodian then deletes the identity-map entry.
+  data. The custodian then deletes the identity-map entry. Since migration 0003 the erasure also
+  redacts the participant's pseudonym and session ids in the access log to `[erased]` (when, role
+  and action stay), and the tombstone is a keyed HMAC of the pseudonym, not a bare hash.
 - **Trained models.** Models trained before a withdrawal may keep statistical influence. Results
   for publication are recomputed after withdrawals, and the notice says so.
 

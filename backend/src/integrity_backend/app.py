@@ -338,8 +338,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/api/participants/{pseudonym}/report")
     async def staff_report(pseudonym: str, authorization: str | None = Header(None)) -> dict[str, Any]:
         actor, role = staff(authorization)
+        try:
+            report = await participant_report(pseudonym)
+        except HTTPException:
+            # Logged without the requested name, so an erased pseudonym never comes back into the log.
+            await store().log_access(actor, role, "read_report", "[unknown participant]")
+            raise
         await store().log_access(actor, role, "read_report", pseudonym)
-        return await participant_report(pseudonym)
+        return report
 
     @app.post("/api/sessions/{session_id}/decision")
     async def record_decision(session_id: str, body: DecisionIn, authorization: str | None = Header(None)) -> dict[str, Any]:
@@ -375,7 +381,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.post("/api/me/withdraw")
     async def withdraw(authorization: str | None = Header(None)) -> dict[str, Any]:
         """The participant withdraws: collection stops and all their data is erased (SPEC 10.3, 10.7).
-        The log entry names no pseudonym; the erasure_log tombstone keeps only its hash."""
+        The log entry names no pseudonym, earlier entries naming it or its sessions are redacted, and the
+        erasure_log tombstone keeps only a keyed HMAC of it."""
         pseudonym = await store().participant_by_token(_bearer(authorization))
         if pseudonym is None:
             raise HTTPException(403, "not authorised")

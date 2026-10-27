@@ -117,7 +117,39 @@ def test_withdrawal_erases_everything_and_the_token_stops_working(client: Any, d
         assert raw(db_url, f"SELECT count(*) AS n FROM {table} WHERE session_id = '{exam}'")[0]["n"] == 0
     log = client.get("/api/access-log", headers=ADMIN).json()
     assert any(e["action"] == "withdraw_and_erase" for e in log)
-    assert not any(p["pseudonym"] in (e["target"], e["actor"]) for e in log if e["action"] == "withdraw_and_erase")
+    # Earlier entries naming the participant or their exam are redacted, not left behind (migration 0003).
+    assert not any(x in (e["target"], e["actor"]) for e in log for x in (p["pseudonym"], exam))
+    redacted = {(e["action"], e["actor"], e["target"]) for e in log if "[erased]" in (e["actor"], e["target"])}
+    assert ("add_appeal", "[erased]", "[erased]") in redacted
+    assert ("record_decision:inconclusive", "reviewer-1", "[erased]") in redacted
+
+
+def test_access_log_redaction_is_the_only_update_allowed(client: Any, db_url: str) -> None:
+    import asyncio
+
+    import asyncpg
+
+    client.get("/api/participants", headers=REVIEWER)
+
+    async def attempt(sql: str, erasure: bool) -> None:
+        conn = await asyncpg.connect(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+        try:
+            async with conn.transaction():
+                if erasure:
+                    await conn.execute("SELECT set_config('integrity.erasure', 'on', true)")
+                await conn.execute(sql)
+        finally:
+            await conn.close()
+
+    with pytest.raises(Exception, match="append-only"):
+        asyncio.run(attempt("UPDATE access_log SET target = '[erased]'", erasure=False))      # not outside erasure
+    with pytest.raises(Exception, match="append-only"):
+        asyncio.run(attempt("UPDATE access_log SET action = 'nothing'", erasure=True))        # never anything else
+    with pytest.raises(Exception, match="append-only"):
+        asyncio.run(attempt("UPDATE access_log SET target = 'someone-else'", erasure=True))   # only to '[erased]'
+    with pytest.raises(Exception, match="append-only"):
+        asyncio.run(attempt("DELETE FROM access_log", erasure=True))
+    asyncio.run(attempt("UPDATE access_log SET actor = '[erased]' WHERE id = (SELECT max(id) FROM access_log)", erasure=True))
 
 
 def test_retention_job_against_the_database(make_client: Any) -> None:

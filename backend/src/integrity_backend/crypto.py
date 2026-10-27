@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import os
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -15,6 +17,15 @@ class FieldCipher:
         if len(key) != 32:
             raise ValueError("AES-256-GCM needs a 32-byte key")
         self._aead = AESGCM(key)
+        self._key = key
+
+    def subkey(self, label: bytes) -> bytes:
+        """A separate key for another purpose (HMAC-SHA256 of the label), so the field key itself is used only for AES-GCM."""
+        return hmac.new(self._key, b"integrity-subkey:" + label, hashlib.sha256).digest()
+
+    def keyed_ref(self, label: bytes, value: str) -> str:
+        """A keyed reference to an identifier: unlinkable without the key, unlike a bare hash of a small space."""
+        return hmac.new(self.subkey(label), value.encode("utf-8"), hashlib.sha256).hexdigest()
 
     def encrypt(self, plaintext: bytes, aad: bytes) -> bytes:
         nonce = os.urandom(_NONCE_BYTES)
