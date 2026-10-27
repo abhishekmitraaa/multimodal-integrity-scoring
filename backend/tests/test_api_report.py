@@ -119,3 +119,34 @@ def test_stages_reach_the_dashboard_and_the_report(client: Any) -> None:
     report = client.get(f"/api/participants/{p['pseudonym']}/report", headers=REVIEWER).json()
     assert [s["problem_id"] for s in report["baseline"]["practice_sessions"]] == ["practice_sum_evens"]   # check held out
     assert report["baseline"]["check"]["status"] == "unavailable"        # no model in the test data root
+
+
+def test_participant_texts_carry_no_numbers() -> None:
+    import re
+
+    from integrity_backend.app import redact_for_participant
+
+    report = {
+        "baseline": {"check": {"status": "not_confirmed", "detail": "(100% of 2 windows outside)", "windows": [4.3], "share_above": 1.0}},
+        "exams": [{"keystroke": {"available": True, "windows": [{"t": 1, "distance": 4.1}], "threshold": 2.13},
+                   "findings": [{"id": "keystroke", "status": "flag", "title": "Typing rhythm vs baseline", "detail": "100% of 3 exam windows"},
+                                {"id": "baseline_check", "status": "flag", "title": "Baseline check did not match", "detail": "100% of 2 windows"},
+                                {"id": "external_paste", "status": "ok", "title": "Pastes", "detail": "None."}],
+                   "reasons": ["Typing rhythm vs baseline: 100% of 3 exam windows"]}],
+        "overall": {"state": "review", "reasons": ["Typing rhythm vs baseline: 100% of 3 exam windows"]},
+    }
+    out = redact_for_participant(report)
+    texts = [out["baseline"]["check"]["detail"], *out["overall"]["reasons"],
+             *(f["detail"] for f in out["exams"][0]["findings"] if f["id"] in ("keystroke", "baseline_check"))]
+    assert texts and not any(re.search(r"\d", x) for x in texts)
+    assert "windows" not in out["baseline"]["check"] and out["exams"][0]["keystroke"] == {"available": False, "redacted": True}
+
+
+def test_two_concurrent_check_requests_create_only_one_session(client: Any) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+
+    p = client.post("/api/participants", json={"kind": "synthetic", "age_confirmed": True, "consent": CONSENT}).json()
+    body = {"participant_token": p["participant_token"], "kind": "practice", "problem_id": "check_count_vowels"}
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        codes = sorted(pool.map(lambda _: client.post("/api/sessions", json=body).status_code, range(4)))
+    assert codes == [200, 409, 409, 409]

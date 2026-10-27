@@ -21,7 +21,7 @@ from .crypto import FieldCipher
 from .replay import replay
 from .report import build_report
 from .settings import Settings, load_config, load_settings
-from .store import Store, now_us
+from .store import SessionLimitError, Store, now_us
 from .wire import WireError, parse_message, validate_batch
 
 PROBLEMS_DIR = Path(__file__).resolve().parents[2] / "problems"
@@ -111,13 +111,32 @@ NUMERIC_DETECTION_FIELDS = ("windows", "population_threshold", "personal_thresho
                             "eer_threshold", "g")
 
 
+PARTICIPANT_TEXT = {
+    ("keystroke", "flag"): "Your typing rhythm in the exam differs from your practice typing more than usual. A person will look at it.",
+    ("keystroke", "ok"): "Your typing rhythm in the exam is within the usual range of your practice typing.",
+    ("keystroke", "unavailable"): "The typing comparison could not run for this exam.",
+    ("baseline_check", "flag"): "Your baseline check did not match your practice typing. A person will look at it.",
+}
+CHECK_TEXT = {
+    "confirmed": "Your baseline check matched your practice typing.",
+    "not_confirmed": "Your baseline check did not match your practice typing. A person will look at it.",
+}
+
+
 def redact_for_participant(report: dict[str, Any]) -> dict[str, Any]:
-    """A participant sees verdicts and plain-language findings, not distances or thresholds, which
-    would show how close to the line a typing style can go (security review of D-038)."""
+    """A participant sees verdicts and plain-language findings without distances, thresholds or
+    shares, which would show how close to the line a typing style can go (security reviews of D-038).
+    The typing-rhythm and baseline-check texts are replaced, and the reasons rebuilt from them."""
     check = report["baseline"].get("check", {})
-    report["baseline"]["check"] = {k: v for k, v in check.items() if k not in NUMERIC_DETECTION_FIELDS}
+    check = {k: v for k, v in check.items() if k not in NUMERIC_DETECTION_FIELDS}
+    check["detail"] = CHECK_TEXT.get(check.get("status", ""), check.get("detail", ""))
+    report["baseline"]["check"] = check
     for exam in report["exams"]:
         exam["keystroke"] = {"available": False, "redacted": bool(exam["keystroke"].get("available"))}
+        for f in exam["findings"]:
+            f["detail"] = PARTICIPANT_TEXT.get((f["id"], f["status"]), f["detail"])
+        exam["reasons"] = [f"{f['title']}: {f['detail']}" for f in exam["findings"] if f["status"] == "flag"]
+    report["overall"]["reasons"] = [r for e in report["exams"] for r in e["reasons"]]
     return report
 
 
@@ -235,11 +254,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         problem = problems[body.problem_id]
         if body.kind != problem["kind"]:        # the server decides; the client's kind must agree
             raise HTTPException(400, f"{body.problem_id} is a {problem['kind']} task")
-        if problem.get("stage") == "check":     # one baseline check per participant (D-038)
-            check_ids = [pid for pid, p in problems.items() if p.get("stage") == "check"]
-            if await store().count_sessions(pseudonym, check_ids) > 0:
-                raise HTTPException(409, "the baseline check can only be taken once")
-        session_id, token = await store().create_session(pseudonym, problem["kind"], body.problem_id)
+        once = [pid for pid, p in problems.items() if p.get("stage") == "check"] if problem.get("stage") == "check" else []
+        try:          # one baseline check per participant (D-038), checked and inserted atomically
+            session_id, token = await store().create_session(pseudonym, problem["kind"], body.problem_id, at_most_once_among=once)
+        except SessionLimitError as exc:
+            raise HTTPException(409, "the baseline check can only be taken once") from exc
         return {"session_id": session_id, "session_token": token}
 
     # ---- session-token endpoints -------------------------------------------------------------

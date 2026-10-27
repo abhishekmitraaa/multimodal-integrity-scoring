@@ -58,6 +58,10 @@ class SessionRow:
     epoch: int
 
 
+class SessionLimitError(Exception):
+    """The participant already has the one session allowed for this problem."""
+
+
 class Store:
     def __init__(self, engine: AsyncEngine, cipher: FieldCipher, pseudonym_prefixes: dict[str, str]) -> None:
         self.engine = engine
@@ -93,11 +97,22 @@ class Store:
             ).first()
         return None if row is None else str(row.pseudonym)
 
-    async def create_session(self, pseudonym: str, kind: str, problem_id: str) -> tuple[str, str]:
+    async def create_session(self, pseudonym: str, kind: str, problem_id: str,
+                             at_most_once_among: Sequence[str] = ()) -> tuple[str, str]:
+        """With at_most_once_among, refuse (SessionLimitError) if the participant already has a session
+        for any of those problems. The participant row is locked, so two concurrent requests cannot
+        both pass the check (security review of D-038)."""
         session_id = str(uuid.uuid4())
         token = secrets.token_urlsafe(32)
         nonce = secrets.token_bytes(32)
         async with self.engine.begin() as conn:
+            if at_most_once_among:
+                await conn.execute(text("SELECT 1 FROM participants WHERE pseudonym = :p FOR UPDATE"), {"p": pseudonym})
+                existing = (await conn.execute(
+                    text("SELECT count(*) AS n FROM sessions WHERE pseudonym = :p AND problem_id = ANY(:ids)"),
+                    {"p": pseudonym, "ids": list(at_most_once_among)})).one()
+                if existing.n > 0:
+                    raise SessionLimitError(problem_id)
             await conn.execute(
                 text(
                     "INSERT INTO sessions (session_id, pseudonym, kind, problem_id, nonce, token_sha256, head_hash) "
@@ -171,12 +186,6 @@ class Store:
                 entry["sessions"].append({"session_id": str(r.session_id), "kind": r.kind, "problem_id": r.problem_id,
                                           "created_at": r.s_created.isoformat(), "closed": r.closed_at is not None})
         return list(out.values())
-
-    async def count_sessions(self, pseudonym: str, problem_ids: Sequence[str]) -> int:
-        async with self.engine.connect() as conn:
-            row = (await conn.execute(text("SELECT count(*) AS n FROM sessions WHERE pseudonym = :p AND problem_id = ANY(:ids)"),
-                                      {"p": pseudonym, "ids": list(problem_ids)})).first()
-        return int(row.n) if row else 0
 
     async def participant_sessions_with_events(self, pseudonym: str) -> list[dict[str, Any]] | None:
         """Every session of a participant with its decrypted client and server events, oldest first."""
@@ -332,6 +341,63 @@ class Store:
             for r in rows
         ]
         return genesis(session_id, bytes(srow.nonce)), links
+
+    # ---- reviewer decisions and appeals (D-039) ------------------------------------------
+
+    @staticmethod
+    def _note_aad(kind: str, session_id: str) -> bytes:
+        """Binds an encrypted note to its kind and session (a ciphertext cannot be moved elsewhere)."""
+        return f"{kind}:{session_id}".encode("ascii")
+
+    async def add_decision(self, session_id: str, reviewer: str, decision: str, report_state: str, notes: str) -> dict[str, Any]:
+        ct = self.cipher.encrypt(notes.encode("utf-8"), self._note_aad("decision", session_id))
+        async with self.engine.begin() as conn:
+            row = (await conn.execute(
+                text("INSERT INTO review_decisions (session_id, reviewer, decision, report_state, notes_ct) "
+                     "VALUES (:s, :r, :d, :st, :n) RETURNING id, at"),
+                {"s": session_id, "r": reviewer, "d": decision, "st": report_state, "n": ct})).one()
+        return {"id": int(row.id), "at": row.at.isoformat()}
+
+    async def add_appeal(self, session_id: str, pseudonym: str, note: str) -> dict[str, Any]:
+        ct = self.cipher.encrypt(note.encode("utf-8"), self._note_aad("appeal", session_id))
+        async with self.engine.begin() as conn:
+            row = (await conn.execute(
+                text("INSERT INTO appeals (session_id, pseudonym, note_ct) VALUES (:s, :p, :n) RETURNING id, at"),
+                {"s": session_id, "p": pseudonym, "n": ct})).one()
+        return {"id": int(row.id), "at": row.at.isoformat()}
+
+    async def reviews_for(self, session_ids: Sequence[str]) -> dict[str, dict[str, list[dict[str, Any]]]]:
+        """Decisions (oldest first; the last one is current) and appeals per session, notes decrypted."""
+        out: dict[str, dict[str, list[dict[str, Any]]]] = {sid: {"decisions": [], "appeals": []} for sid in session_ids}
+        if not session_ids:
+            return out
+        async with self.engine.connect() as conn:
+            decisions = (await conn.execute(
+                text("SELECT session_id, reviewer, decision, report_state, notes_ct, at FROM review_decisions "
+                     "WHERE session_id = ANY(CAST(:ids AS uuid[])) ORDER BY id"), {"ids": list(session_ids)})).all()
+            appeals = (await conn.execute(
+                text("SELECT session_id, note_ct, at FROM appeals WHERE session_id = ANY(CAST(:ids AS uuid[])) ORDER BY id"),
+                {"ids": list(session_ids)})).all()
+        for d in decisions:
+            sid = str(d.session_id)
+            out[sid]["decisions"].append({
+                "decision": d.decision, "reviewer": d.reviewer, "report_state": d.report_state, "at": d.at.isoformat(),
+                "notes": self.cipher.decrypt(bytes(d.notes_ct), self._note_aad("decision", sid)).decode("utf-8"),
+            })
+        for a in appeals:
+            sid = str(a.session_id)
+            out[sid]["appeals"].append({
+                "at": a.at.isoformat(),
+                "note": self.cipher.decrypt(bytes(a.note_ct), self._note_aad("appeal", sid)).decode("utf-8"),
+            })
+        return out
+
+    async def latest_decisions(self) -> dict[str, str]:
+        """session_id -> its current decision, for the participant list."""
+        async with self.engine.connect() as conn:
+            rows = (await conn.execute(text(
+                "SELECT DISTINCT ON (session_id) session_id, decision FROM review_decisions ORDER BY session_id, id DESC"))).all()
+        return {str(r.session_id): r.decision for r in rows}
 
     # ---- audit and erasure ---------------------------------------------------------------
 
