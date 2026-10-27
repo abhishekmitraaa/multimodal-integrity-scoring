@@ -245,7 +245,8 @@ def _exam_report(s: SessionEvents, model: Model | None, prototype: NDArray[np.fl
     findings.append(_finding("away", "info", "Time away from the window", f"{round(ins.away_seconds)} s with the browser window out of focus."))
     # 8. AST jumps (SPEC 6.3): dashboard evidence, not a flag (pastes and unexplained inserts behind them are rules 2-5)
     a = cfg["ast"]
-    tl = ast_timeline(s["events"], int(a["jump_min_nodes"]), int(a["jump_max_keydowns"]), int(a["max_snapshots"]))
+    tl = ast_timeline(s["events"], int(a["jump_min_nodes"]), int(a["jump_max_keydowns"]), int(a["max_snapshots"]),
+                      int(a["max_parse_chars"]))
     at = ", ".join(f"{int((j.t - t0) // 60)}:{int((j.t - t0) % 60):02d}" for j in tl.jumps)
     findings.append(_finding(
         "ast_jump", "info", "Code structure that arrived without typing",

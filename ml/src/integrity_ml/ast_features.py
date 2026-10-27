@@ -215,16 +215,20 @@ class AstTimeline:
     final: AstSummary | None  # the last snapshot parsed
 
 
-def ast_timeline(events: Sequence[Event], min_nodes: int, max_keydowns: int, max_snapshots: int) -> AstTimeline:
+def ast_timeline(events: Sequence[Event], min_nodes: int, max_keydowns: int, max_snapshots: int,
+                 max_chars: int) -> AstTimeline:
     """AST jumps (SPEC 6.3): between consecutive snapshots, at least min_nodes named nodes appear
-    while fewer than max_keydowns editor keydowns were typed. Identical snapshots are parsed once.
-    Bounded: at most max_snapshots distinct snapshots are parsed (a forged log cannot make the
-    server parse without limit), and truncation is reported, not hidden."""
+    while fewer than max_keydowns editor keydowns were typed. Identical snapshots are parsed once;
+    identity is the server's own hash of the text, never the client's sha256 field, which a forged
+    log could set to skip a snapshot. Bounded: at most max_snapshots distinct snapshots and
+    max_chars characters in all are parsed (a forged log cannot make the server parse without
+    limit), and truncation is reported, not hidden."""
     jumps: list[AstJump] = []
     prev: AstSummary | None = None
     prev_sha: str | None = None
     keydowns = 0
     parsed = 0
+    chars = 0
     truncated = False
     for e in events:
         if e.get("t_client_us") is None:
@@ -233,15 +237,17 @@ def ast_timeline(events: Sequence[Event], min_nodes: int, max_keydowns: int, max
         if e["type"] == "keydown" and d.get("target", "editor") == "editor" and not d.get("rep"):
             keydowns += 1
         elif e["type"] == "snapshot":
-            sha = str(d.get("sha256") or hashlib.sha256(str(d["text"]).encode()).hexdigest())
+            text = str(d["text"])
+            sha = hashlib.sha256(text.encode("utf-8", "surrogatepass")).hexdigest()
             if sha == prev_sha:              # unchanged: still a snapshot boundary, nothing to parse
                 keydowns = 0
                 continue
-            if parsed >= max_snapshots:
+            if parsed >= max_snapshots or chars + len(text) > max_chars:
                 truncated = True
                 break
-            cur = summarize(str(d["text"]))
+            cur = summarize(text)
             parsed += 1
+            chars += len(text)
             if prev is not None and cur.named_nodes - prev.named_nodes >= min_nodes and keydowns < max_keydowns:
                 jumps.append(AstJump(e["t_client_us"] / 1e6, cur.named_nodes - prev.named_nodes, keydowns, str(d.get("reason", ""))))
             prev, prev_sha, keydowns = cur, sha, 0

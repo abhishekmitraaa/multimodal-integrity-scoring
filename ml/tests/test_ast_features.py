@@ -116,18 +116,29 @@ def test_ast_jump_when_structure_arrives_without_typing() -> None:
     grow = summarize(big).named_nodes - summarize(small).named_nodes
     assert grow >= 30
     pasted = [_snap(0, small, "segment_start"), *_keys(1, 5), _snap(3, big, "large_insert")]
-    tl = ast_timeline(pasted, min_nodes=30, max_keydowns=30, max_snapshots=100)
+    tl = ast_timeline(pasted, min_nodes=30, max_keydowns=30, max_snapshots=100, max_chars=10_000)
     assert [(j.t, j.added_nodes, j.keydowns, j.reason) for j in tl.jumps] == [(3.0, grow, 5, "large_insert")]
     assert tl.snapshots == 2 and not tl.truncated and tl.final is not None
     typed = [_snap(0, small, "segment_start"), *_keys(1, 200), _snap(30, big)]
-    assert ast_timeline(typed, 30, 30, 100).jumps == []            # same growth, but typed
+    assert ast_timeline(typed, 30, 30, 100, 10_000).jumps == []            # same growth, but typed
 
 
 def test_ast_timeline_skips_identical_snapshots_and_is_bounded() -> None:
     code = "x = 1\n"
     flood = [_snap(i, code) for i in range(50)]
-    tl = ast_timeline(flood, 30, 30, max_snapshots=3)
+    tl = ast_timeline(flood, 30, 30, max_snapshots=3, max_chars=10_000)
     assert tl.snapshots == 1 and not tl.truncated                 # identical text is parsed once
     distinct = [_snap(i, f"x = {i}\n") for i in range(10)]
-    tl = ast_timeline(distinct, 30, 30, max_snapshots=3)
+    tl = ast_timeline(distinct, 30, 30, max_snapshots=3, max_chars=10_000)
     assert tl.snapshots == 3 and tl.truncated                     # said, not hidden
+    tl = ast_timeline(distinct, 30, 30, max_snapshots=100, max_chars=13)
+    assert tl.snapshots == 2 and tl.truncated                     # character budget: 6 + 6 fit, the third does not
+
+
+def test_a_forged_client_hash_cannot_hide_a_snapshot() -> None:
+    small = "def f(x):\n    return x\n"
+    big = small + "".join(f"\ndef g{i}(a, b):\n    if a > b:\n        return [a, b]\n    return (b, a)\n" for i in range(4))
+    first, second = _snap(0, small, "segment_start"), _snap(3, big, "large_insert")
+    first["data"]["sha256"] = second["data"]["sha256"] = "same-forged-hash"
+    tl = ast_timeline([first, second], 30, 30, 100, 10_000)
+    assert len(tl.jumps) == 1 and tl.snapshots == 2              # identity is the server's hash of the text

@@ -141,7 +141,9 @@ scope (D-025); this stays an open question.
    but there is one shared reviewer token, so "who decided" is the role ("reviewer-1"), not a
    named person. Named reviewer accounts are needed before reviewers outside the team (Q4).
 5. **Report endpoints are not rate-limited.** That's fine on one laptop, but needed before any
-   deployment.
+   deployment Reports are rebuilt on every request; with AST parsing, a forged worst-case log costs
+   about 3 s per exam (bounded by `features.ast.max_snapshots` and `max_parse_chars`). Cache per
+   closed session before deployment.
 
 ## What the lead should decide next
 
