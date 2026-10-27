@@ -107,6 +107,20 @@ def report_config() -> dict[str, Any]:
     }
 
 
+NUMERIC_DETECTION_FIELDS = ("windows", "population_threshold", "personal_threshold", "share_above", "threshold",
+                            "eer_threshold", "g")
+
+
+def redact_for_participant(report: dict[str, Any]) -> dict[str, Any]:
+    """A participant sees verdicts and plain-language findings, not distances or thresholds, which
+    would show how close to the line a typing style can go (security review of D-038)."""
+    check = report["baseline"].get("check", {})
+    report["baseline"]["check"] = {k: v for k, v in check.items() if k not in NUMERIC_DETECTION_FIELDS}
+    for exam in report["exams"]:
+        exam["keystroke"] = {"available": False, "redacted": bool(exam["keystroke"].get("available"))}
+    return report
+
+
 def load_keystroke_model(data_root: Path, model_file: str) -> tuple[Any, str]:
     """(model or None, note). The model is optional: without it the keystroke check says so."""
     path = data_root / model_file
@@ -144,7 +158,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             # whether they are being flagged. And no server paths or exception text.
             sessions = [x for x in sessions if x["closed"]]
             note = "Keystroke reference ranges from a public dataset." if model is not None else "The typing check is not available on this server."
-        return await asyncio.to_thread(build_report, pseudonym, sessions, model, note, rcfg)
+        report = await asyncio.to_thread(build_report, pseudonym, sessions, model, note, rcfg)
+        return redact_for_participant(report) if for_participant else report
     policy = policy_payload(settings.editor_policy)
     prefixes = {
         "real": settings.privacy["pseudonym"]["prefix_real"],
@@ -217,7 +232,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(403, "bad participant token")
         if body.problem_id not in problems:
             raise HTTPException(404, "unknown problem")
-        session_id, token = await store().create_session(pseudonym, body.kind, body.problem_id)
+        problem = problems[body.problem_id]
+        if body.kind != problem["kind"]:        # the server decides; the client's kind must agree
+            raise HTTPException(400, f"{body.problem_id} is a {problem['kind']} task")
+        if problem.get("stage") == "check":     # one baseline check per participant (D-038)
+            check_ids = [pid for pid, p in problems.items() if p.get("stage") == "check"]
+            if await store().count_sessions(pseudonym, check_ids) > 0:
+                raise HTTPException(409, "the baseline check can only be taken once")
+        session_id, token = await store().create_session(pseudonym, problem["kind"], body.problem_id)
         return {"session_id": session_id, "session_token": token}
 
     # ---- session-token endpoints -------------------------------------------------------------

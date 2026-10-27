@@ -38,6 +38,7 @@ export async function setupPage(root: HTMLElement): Promise<void> {
     h("button", {
       "data-problem": p.id,
       class: done.has(p.id) ? "task-done" : undefined,
+      disabled: p.stage === "check" && done.has(p.id),     // the server allows one baseline check (D-038)
       onclick: async () => {
         const setup: SetupState = {
           keyboardType: (keyboard as HTMLSelectElement).value as SetupState["keyboardType"],

@@ -30,27 +30,34 @@ system works end to end. It says nothing about how well it detects cheating.
 5. **The reviewer dashboard** (`#/dashboard`) lists every participant with progress, opens the same
    report, and links each exam to its keystroke-by-keystroke replay. Every read is access-logged.
 
-## Addition: the baseline check (D-038, 2026-10-26)
+## Addition: the baseline check (D-038, 2026-10-26; hardened 2026-10-27)
 
 The lead asked for a test after the baseline that checks the baseline and supports detection. Setup
 now has three steps: **practice** (3 tasks, the baseline), **baseline check** (1 task, held out),
 then **exam**.
 
-- **Checks the baseline.** The check task's windows are compared with the practice prototype. If
-  most are within the same-person range, the baseline is *confirmed*. If not, it is *not reliable*
-  for this person, and the exam's typing comparison is switched off for them instead of producing
-  false flags.
-- **Supports detection.** A confirmed check gives the person's own normal range (their largest
-  check distance). The exam uses the higher of that and the reference-data line.
+- **Checks the baseline.** The check task's windows are compared with the practice prototype.
+  - If most are within the same-person range, the baseline is *confirmed*.
+  - If not, it is a **review finding**: the baseline may not describe the person, or someone else
+    (or a deliberately different style) typed the check.
+- **Supports detection.** A confirmed check gives the person's own line: their largest check
+  distance, **capped at 1.25 x the reference line**. The exam uses the higher of the two.
+- **Hardened after a security review.** The first version switched the exam's typing comparison
+  off when the check didn't match. That would have let a student fail the check on purpose to
+  escape the comparison. Now:
+  - a failed check never switches detection off;
+  - only the first check counts, and only if submitted before the exam started;
+  - the server allows one check session and decides each session's kind from the problem file;
+  - students' own reports carry no distances or thresholds.
 
 **Synthetic demo with the real model** (`eval/tools/detection_demo/`; two scripted typists, not
-people, three runs, not an accuracy measurement):
+people, three runs, not an accuracy measurement). Reference line 2.13:
 
-| Scenario | Check (distances; reference line 2.13) | Exam distances | Result |
+| Scenario | Check distances | Exam distances | Result |
 |---|---|---|---|
-| Same typist throughout | confirmed (0.84, 1.45) | 0.97, 0.97, 1.35 | No review flags |
-| A different typist in the exam | confirmed (1.18, 1.71) | 3.92, 4.18, 4.13 | **Review recommended** |
-| A different typist in the check | does not match (4.30, 4.51) | comparison switched off | Not enough data (no false flag) |
+| Same typist throughout | confirmed (0.90, 1.37) | 1.14, 0.97, 1.41 | No review flags |
+| A different typist in the exam | confirmed (1.08, 1.54) | **3.95, 4.20, 4.14** | **Review**: typing rhythm |
+| A different typist in the check | **does not match** (4.26, 4.50) | 0.84, 1.48, 1.11 (still compared) | **Review**: baseline check |
 
 ## How it's built
 

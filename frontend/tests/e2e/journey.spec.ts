@@ -65,6 +65,7 @@ test("practice builds a baseline, the exam is checked, the report and dashboard 
   await testAndSubmit(page);
   await page.click("#another-task");
   await expect(page.locator('button[data-problem="check_count_vowels"]')).toHaveClass(/task-done/);
+  await expect(page.locator('button[data-problem="check_count_vowels"]')).toBeDisabled();   // one check only
 
   // Exam: some typing, then a block of code that arrives without key presses.
   await openTask(page, "exam_run_length");
@@ -86,7 +87,9 @@ test("practice builds a baseline, the exam is checked, the report and dashboard 
   await expect(page.locator("#baseline-status")).toContainText(/windows of typing/);
   await expect(page.locator("#baseline-check")).toContainText(/Baseline check: (confirmed|does not match|could not run)/);
   const ks = page.locator('[data-finding="keystroke"]');
-  if (await page.locator(".ks-chart").count()) {
+  await expect(page.locator(".ks-chart")).toHaveCount(0);              // participants never see distances or thresholds
+  const modelRan = (await page.locator("#distances-redacted").count()) > 0;
+  if (modelRan) {
     await expect(ks).toHaveClass(/finding-(ok|flag)/);                  // model installed: compared to the baseline
   } else {
     await expect(ks).toHaveClass(/finding-unavailable/);                // no model on this machine: said plainly
@@ -101,4 +104,5 @@ test("practice builds a baseline, the exam is checked, the report and dashboard 
   await row.locator("button").click();
   await expect(page.locator("#overall-verdict")).toContainText("Review recommended", { timeout: 60_000 });
   await expect(page.locator("#report a[href^='#/replay?session=']")).toHaveCount(1);
+  await expect(page.locator(".ks-chart")).toHaveCount(modelRan ? 1 : 0);   // reviewers do see the distances
 });

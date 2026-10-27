@@ -88,6 +88,26 @@ def test_participant_sees_only_submitted_sessions_and_no_server_details(client: 
     assert staff["exams"][0]["closed"] is False
 
 
+def test_server_decides_kind_and_allows_one_check(client: Any) -> None:
+    p = client.post("/api/participants", json={"kind": "synthetic", "age_confirmed": True, "consent": CONSENT}).json()
+    wrong = client.post("/api/sessions", json={"participant_token": p["participant_token"], "kind": "practice", "problem_id": "exam_run_length"})
+    assert wrong.status_code == 400                                        # the client cannot relabel an exam
+    first = client.post("/api/sessions", json={"participant_token": p["participant_token"], "kind": "practice", "problem_id": "check_count_vowels"})
+    assert first.status_code == 200
+    again = client.post("/api/sessions", json={"participant_token": p["participant_token"], "kind": "practice", "problem_id": "check_count_vowels"})
+    assert again.status_code == 409
+
+
+def test_participant_report_has_no_distances_or_thresholds(client: Any) -> None:
+    p = client.post("/api/participants", json={"kind": "synthetic", "age_confirmed": True, "consent": CONSENT}).json()
+    submit(client, p["participant_token"], "exam", "exam_run_length", pasted_exam)
+    own = client.get("/api/me/report", headers={"Authorization": f"Bearer {p['participant_token']}"}).json()
+    for key in ("windows", "population_threshold", "personal_threshold", "share_above", "threshold"):
+        assert key not in own["baseline"]["check"]
+        assert key not in own["exams"][0]["keystroke"]
+    assert own["exams"][0]["findings"]                                     # plain-language findings remain
+
+
 def test_stages_reach_the_dashboard_and_the_report(client: Any) -> None:
     p = client.post("/api/participants", json={"kind": "synthetic", "age_confirmed": True, "consent": CONSENT}).json()
     submit(client, p["participant_token"], "practice", "practice_sum_evens",

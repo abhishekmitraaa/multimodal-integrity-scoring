@@ -98,6 +98,10 @@ function examSection(ex: ExamReport, replayLink?: (sessionId: string) => string)
       h("li", { class: `finding finding-${f.status}`, "data-finding": f.id },
         h("span", { class: "finding-icon", "aria-hidden": "true" }, STATUS_ICON[f.status]),
         h("div", {}, h("strong", {}, f.title), h("p", {}, f.detail))))),
+    !ex.keystroke.available && ex.keystroke.redacted
+      ? h("p", { class: "muted", id: "distances-redacted" },
+        "The typing distances and thresholds behind this check are shown to reviewers only.")
+      : null,
     chart ? h("figure", { class: "chart-figure" }, chart,
       h("figcaption", { class: "muted" },
         "Each dot is a window of 70 key presses: its distance from this person's practice typing (lower = more alike). ",

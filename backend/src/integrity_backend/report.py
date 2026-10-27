@@ -72,7 +72,9 @@ def build_report(pseudonym: str, sessions: Sequence[SessionEvents], model: Model
     rules = cfg["report"]
     # Stages (D-038): practice tasks build the baseline; the check task is held out and tested against it.
     practice = [s for s in sessions if s["kind"] == "practice" and s["closed"] and s.get("stage", "baseline") == "baseline"]
-    checks = [s for s in sessions if s.get("stage") == "check" and s["closed"]]
+    # Only the first submitted check counts (one check per participant; a retake cannot replace it).
+    checks = sorted((s for s in sessions if s.get("stage") == "check" and s["closed"]),
+                    key=lambda s: s.get("closed_at") or 0.0)[:1]
     exams = [s for s in sessions if s["kind"] == "exam"]
 
     # ---- baseline from the closed practice sessions
@@ -126,9 +128,12 @@ def _check_report(checks: Sequence[SessionEvents], model: Model | None, prototyp
     """The baseline check (D-038): new typing by the same person, compared with the baseline.
 
     confirmed      most check windows are within the same-person range: the baseline describes this
-                   person, and the largest check distance becomes their personal line for the exam.
-    not_confirmed  most check windows are outside it: the baseline is not reliable for this person, so
-                   the exam's typing comparison is switched off (no false flags from a bad baseline).
+                   person, and their largest check distance (capped at check_cap x the reference line)
+                   becomes their personal line for the exam.
+    not_confirmed  most check windows are outside it. The baseline may be unreliable, or the check may
+                   have been typed by someone else or deliberately differently. Nothing is switched off:
+                   it becomes a finding for a person to look at, and the exam is still compared with the
+                   reference line (security review: a failed check must not disable detection).
     """
     if not checks:
         return {"status": "not_done", "detail": "The baseline check has not been done yet."}
@@ -142,9 +147,10 @@ def _check_report(checks: Sequence[SessionEvents], model: Model | None, prototyp
     dist = _distances(model, prototype, wins)
     above = float((dist > population).mean())
     confirmed = above < rules["check_mismatch_share"]
-    personal = float(dist.max()) * float(rules["check_margin"])
+    personal = min(float(dist.max()) * float(rules["check_margin"]), population * float(rules["check_cap"]))
     within = len(wins) - int(round(above * len(wins)))
     return {
+        "closed_at": checks[0].get("closed_at"),
         "status": "confirmed" if confirmed else "not_confirmed",
         "windows": [round(float(d), 3) for d in dist],
         "population_threshold": round(population, 3),
@@ -154,8 +160,8 @@ def _check_report(checks: Sequence[SessionEvents], model: Model | None, prototyp
                    f"same-person range. The baseline is confirmed."
                    if confirmed else
                    f"The check typing does not match the practice typing ({round(100 * above)}% of {len(wins)} windows are "
-                   f"outside the usual same-person range). The baseline is not reliable for this person, so the typing "
-                   f"comparison is not used in the exam report."),
+                   f"outside the usual same-person range). The baseline may not describe this person well, or the check "
+                   f"was typed differently. A person should look; the exam is still compared with the reference range."),
     }
 
 
@@ -180,13 +186,11 @@ def _exam_report(s: SessionEvents, model: Model | None, prototype: NDArray[np.fl
     elif not wins:
         findings.append(_finding("keystroke", "unavailable", "Typing rhythm vs baseline",
                                  f"The exam has fewer than {cfg['m']} key presses, so there is no window to compare."))
-    elif check["status"] == "not_confirmed":
-        findings.append(_finding("keystroke", "unavailable", "Typing rhythm vs baseline",
-                                 "The baseline check did not match this person's practice typing, so the baseline is not "
-                                 "reliable for them and the typing comparison is not used (D-038)."))
     else:
         population, ref = _population_threshold(model, g, rules)
-        personal = check.get("personal_threshold")
+        # The personal line counts only for a confirmed check submitted before this exam started.
+        before = check.get("closed_at") is None or s.get("created_at") is None or check["closed_at"] <= s["created_at"]
+        personal = check.get("personal_threshold") if check["status"] == "confirmed" and before else None
         threshold = max(population, personal) if personal is not None else population
         dist = _distances(model, prototype, [w for w, _ in wins])
         above = float((dist > threshold).mean())
@@ -197,11 +201,16 @@ def _exam_report(s: SessionEvents, model: Model | None, prototype: NDArray[np.fl
         mismatch = above >= rules["keystroke_mismatch_share"] and len(wins) >= rules["keystroke_mismatch_min_windows"]
         line = ("this person's own normal range from the baseline check" if personal is not None and personal > population
                 else "95% of same-person comparisons in the reference data")
-        caveat = "" if check["status"] == "confirmed" else " (No baseline check was done, so only the reference-data range is used.)"
+        caveat = ("" if personal is not None else
+                  " (No usable baseline check, so only the reference-data range is used.)")
         findings.append(_finding(
             "keystroke", "flag" if mismatch else "ok", "Typing rhythm vs baseline",
             f"{round(100 * above)}% of {len(wins)} exam windows are further from this person's practice typing than {line}. "
             + ("That is unusual for the same person." if mismatch else "That is within the usual range for the same person.") + caveat))
+
+    # 1b. The baseline check itself (D-038): a mismatch is for a person to look at, never a switch-off.
+    if check["status"] == "not_confirmed":
+        findings.append(_finding("baseline_check", "flag", "Baseline check did not match", str(check["detail"])))
 
     # 2. Pastes from outside the editor
     ext = ins.external_paste_chars

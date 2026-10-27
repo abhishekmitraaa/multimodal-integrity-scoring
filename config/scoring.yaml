@@ -26,3 +26,4 @@ report:                          # evidence report (D-036). Hand-set rules, NOT 
   machine_rhythm_min_keystrokes: 70             # ...over at least this many key presses
   check_mismatch_share: 0.5      # D-038: the baseline check "does not match" when this share of its windows is above the population line
   check_margin: 1.0              # D-038: personal line = largest check distance x this; the exam uses max(population line, personal line)
+  check_cap: 1.25                # personal line never above this x the population line (an inflated check cannot widen it far)

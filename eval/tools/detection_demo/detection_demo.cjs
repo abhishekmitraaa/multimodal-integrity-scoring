@@ -6,10 +6,15 @@
 // Needs the app running (scripts\dev.ps1) with the model installed. Usage:
 //   node eval\tools\detection_demo\detection_demo.cjs
 const path = require("node:path");
+const fs = require("node:fs");
+const os = require("node:os");
 const { createRequire } = require("node:module");
 const { chromium } = createRequire(path.join(__dirname, "..", "..", "..", "frontend", "package.json"))("playwright");
 
 const BASE = process.env.APP_URL || "http://127.0.0.1:5173";
+// Numbers come from the reviewer report: participants' own reports carry no distances or thresholds.
+const SECRETS = process.env.INTEGRITY_SECRETS_DIR || path.join(os.homedir(), ".integrity-exam", "secrets");
+const REVIEWER_TOKEN = fs.readFileSync(path.join(SECRETS, "reviewer_token.txt"), "utf8").trim();
 const EXAM = "def rle(s):\n    out = []\n    i = 0\n    while i < len(s):\n        j = i\n        while j < len(s) and s[j] == s[i]:\n            j += 1\n        out.append(s[i] + str(j - i))\n        i = j\n    return ''.join(out)\n";
 
 // Typist profiles: key hold and key-to-key gap (ms), log-normal-ish jitter, occasional pauses.
@@ -81,6 +86,7 @@ async function scenario(name, who) {
     await page.check("#agree");
     await page.click("#consent-continue");
     await page.waitForURL(/#\/setup/);
+    const pseudonym = (await page.textContent("#pseudonym")).trim();
     for (const p of ["practice_sum_evens", "practice_word_count", "practice_letter_grade"]) {
       await task(page, p, who.practice);
       await page.click("#another-task");
@@ -88,10 +94,9 @@ async function scenario(name, who) {
     await task(page, "check_count_vowels", who.check);
     await page.click("#another-task");
     await task(page, "exam_run_length", who.exam);
-    const report = await page.evaluate(async () => {
-      const tok = JSON.parse(sessionStorage.getItem("participant")).token;
-      return (await fetch("/api/me/report", { headers: { Authorization: `Bearer ${tok}` } })).json();
-    });
+    const report = await page.evaluate(async ([p, tok]) =>
+      (await fetch(`/api/participants/${encodeURIComponent(p)}/report`, { headers: { Authorization: `Bearer ${tok}` } })).json(),
+    [pseudonym, REVIEWER_TOKEN]);
     await page.click("#see-report");
     await page.waitForSelector("#overall-verdict");
     await page.screenshot({ path: path.join(process.env.DEMO_OUT || ".", `detection-${name}.png`), fullPage: true });

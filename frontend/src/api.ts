@@ -113,7 +113,7 @@ export interface ExamReport {
   state: Exclude<ReportState, "no_exam_yet">;
   reasons: string[];
   findings: Finding[];
-  keystroke: { available: false } | {
+  keystroke: { available: false; redacted?: boolean } | {
     available: true; g: number; threshold: number; population_threshold: number; personal_threshold: number | null;
     eer_threshold: number; share_above: number;
     windows: Array<{ t: number; distance: number }>;

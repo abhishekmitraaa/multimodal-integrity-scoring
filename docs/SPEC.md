@@ -1052,8 +1052,10 @@ The full design follows.
      consequences in §1.4.
   3. **Baseline check [D-038].** After the practice tasks, one more shown-code task is typed. It is
      held out of the baseline and compared with it. If it matches, the baseline is confirmed and
-     sets the person's own normal range for the exam. If not, the exam's typing comparison is
-     switched off for that person.
+     sets the person's own normal range for the exam, capped at 1.25 x the reference line. If not,
+     it becomes a review finding, and the exam is still compared with the reference line: a failed
+     check never switches detection off. One check per participant, counted only if submitted
+     before the exam started.
   4. Expected yield: about 1000+ keystrokes per module, so 5–10 baseline windows are easy to reach.
      It may be lower now, because the given solutions are short; this is checked in the pilot.
 - **Sitting 2 (≥ 1 day later, ~60 min).** Short exam tasks, each under one condition. Order is

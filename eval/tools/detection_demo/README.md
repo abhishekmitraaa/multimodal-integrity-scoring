@@ -8,10 +8,11 @@ keystroke model judges the result.
 |---|---|---|---|---|
 | A | A | A | A | check confirmed, no review flags |
 | B | A | A | B | check confirmed, exam flagged |
-| C | A | B | A | check does not match, typing comparison off |
+| C | A | B | A | check does not match: review finding; exam still compared |
 
 This shows the mechanism works end to end. It is **not** an accuracy measurement: scripted typists
-are not people, and three runs are not a sample. Each run creates a `DEV-` participant.
+are not people, and three runs are not a sample. Each run creates a `DEV-` participant. Numbers come
+from the reviewer report (reviewer token from the secrets folder): participants' own reports carry none.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\dev.ps1     # in one window, with the model installed

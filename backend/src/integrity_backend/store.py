@@ -10,7 +10,7 @@ import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Sequence
+from typing import Any, Sequence, Sequence
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
@@ -172,6 +172,12 @@ class Store:
                                           "created_at": r.s_created.isoformat(), "closed": r.closed_at is not None})
         return list(out.values())
 
+    async def count_sessions(self, pseudonym: str, problem_ids: Sequence[str]) -> int:
+        async with self.engine.connect() as conn:
+            row = (await conn.execute(text("SELECT count(*) AS n FROM sessions WHERE pseudonym = :p AND problem_id = ANY(:ids)"),
+                                      {"p": pseudonym, "ids": list(problem_ids)})).first()
+        return int(row.n) if row else 0
+
     async def participant_sessions_with_events(self, pseudonym: str) -> list[dict[str, Any]] | None:
         """Every session of a participant with its decrypted client and server events, oldest first."""
         async with self.engine.connect() as conn:
@@ -179,13 +185,14 @@ class Store:
                                          {"p": pseudonym})).first()
             if exists is None:
                 return None
-            rows = (await conn.execute(text("SELECT session_id, kind, problem_id, closed_at FROM sessions "
+            rows = (await conn.execute(text("SELECT session_id, kind, problem_id, created_at, closed_at FROM sessions "
                                             "WHERE pseudonym = :p ORDER BY created_at"), {"p": pseudonym})).all()
         sessions = []
         for r in rows:
             _, links = await self.load_links(str(r.session_id))
             sessions.append({
                 "session_id": str(r.session_id), "kind": r.kind, "problem_id": r.problem_id, "closed": r.closed_at is not None,
+                "created_at": r.created_at.timestamp(), "closed_at": r.closed_at.timestamp() if r.closed_at else None,
                 "events": [{"type": lk.record.type, "t_client_us": lk.record.t_client_us, "data": lk.record.data} for lk in links],
             })
         return sessions

@@ -159,12 +159,15 @@ def test_check_by_the_same_typer_confirms_the_baseline_and_sets_a_personal_line(
     assert exam_state(r) == "no_review_flags"
 
 
-def test_check_that_does_not_match_switches_the_typing_comparison_off() -> None:
+def test_check_that_does_not_match_goes_to_review_and_never_switches_detection_off() -> None:
+    # A student could type the check deliberately differently, hoping to turn the typing comparison off.
     r = build_report("DEV-C2", practice() + [check(Log().type(140, 400, hold_ms=150, seed=21)),
                                              session("exam", Log().type(210, 400, hold_ms=150, seed=9), "e")], FakeModel(), "", CFG)
     assert r["baseline"]["check"]["status"] == "not_confirmed"
-    assert finding(r, "keystroke")["status"] == "unavailable"          # no false flag from an unreliable baseline
-    assert exam_state(r) == "insufficient_data"
+    assert finding(r, "baseline_check")["status"] == "flag"
+    assert finding(r, "keystroke")["status"] == "flag"                 # still compared with the reference line
+    assert r["exams"][0]["keystroke"]["personal_threshold"] is None
+    assert exam_state(r) == "review"
 
 
 def test_detection_a_different_typer_in_the_exam_is_flagged_after_a_confirmed_check() -> None:
@@ -177,4 +180,26 @@ def test_detection_a_different_typer_in_the_exam_is_flagged_after_a_confirmed_ch
 def test_no_check_yet_uses_the_reference_line_and_says_so() -> None:
     r = build_report("DEV-C4", practice() + [session("exam", Log().type(210, 180, seed=9), "e")], FakeModel(), "", CFG)
     assert r["baseline"]["check"]["status"] == "not_done"
-    assert "No baseline check was done" in finding(r, "keystroke")["detail"]
+    assert "No usable baseline check" in finding(r, "keystroke")["detail"]
+
+
+def test_personal_line_is_capped() -> None:
+    # A sloppy-but-matching check must not widen the personal line beyond check_cap x the reference line.
+    ref = 0.05
+    big = {**CFG, "report": {**RULES, "check_mismatch_share": 1.01}}       # accept any check, to reach the cap
+    r = build_report("DEV-C5", practice() + [check(Log().type(140, 900, hold_ms=300, seed=21)),
+                                             session("exam", Log().type(210, 180, seed=9), "e")], FakeModel(), "", big)
+    assert r["baseline"]["check"]["personal_threshold"] == pytest.approx(ref * RULES["check_cap"], abs=1e-3)   # stored to 3 decimals
+
+
+def test_a_check_taken_after_the_exam_started_does_not_count_and_only_the_first_check_counts() -> None:
+    late = {**check(Log().type(140, 180, seed=21), "late"), "closed_at": 200.0}
+    exam = {**session("exam", Log().type(210, 180, seed=9), "e"), "created_at": 100.0}
+    r = build_report("DEV-C6", practice() + [late, exam], FakeModel(), "", CFG)
+    assert r["baseline"]["check"]["status"] == "confirmed"
+    assert r["exams"][0]["keystroke"]["personal_threshold"] is None        # check closed after the exam started
+
+    first = {**check(Log().type(140, 400, hold_ms=150, seed=21), "first"), "closed_at": 10.0}
+    retake = {**check(Log().type(140, 180, seed=22), "retake"), "closed_at": 20.0}
+    r = build_report("DEV-C7", practice() + [first, retake], FakeModel(), "", CFG)
+    assert r["baseline"]["check"]["status"] == "not_confirmed"              # a retake cannot replace the first check
