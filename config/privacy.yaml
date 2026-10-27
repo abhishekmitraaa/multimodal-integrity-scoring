@@ -8,7 +8,14 @@ pseudonym:
   prefix_dev: "DEV-"         # team members testing the app; never used in results, purged routinely
   length: 8
   alphabet: crockford_base32
-retention_days_after_project_end: null   # [OPEN Q4] N, set by the faculty guide before real collection
+retention_days_after_project_end: null   # Q4 (settled 2026-10-27): raw logs, days after project end. Lead enters the value.
+governance:                      # Q4 answers (SPEC 10.2, 10.3, 10.7), settled with the faculty guide 2026-10-27; the lead enters them.
+  data_fiduciary: null           # responsible party shown in the notice, e.g. "<project> under VIT, via <faculty guide>"
+  contact: null                  # withdrawal and grievance contact shown in the notice
+  project_end_date: null         # YYYY-MM-DD; both retention clocks start here
+  derived_retention_days_after_project_end: null   # pseudonymised derived features
+  # The identity-map custodian is named in the governance one-pager only: never in config, the
+  # database or the repo (SPEC 10.5). Real collection cannot be enabled while any value is null.
 data_root: null                  # set INTEGRITY_DATA_ROOT; must be outside the repo and any cloud-synced folder
 forbidden_data_root_markers: [OneDrive, Dropbox, "Google Drive", iCloud]
 encryption:

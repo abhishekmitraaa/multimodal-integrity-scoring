@@ -1,7 +1,8 @@
 # SPEC: Personalized Multi-Modal Integrity Scoring for Live Coding Exams
 
 Version 0.3, 2026-09-26. Course: BITE308L, VIT. Status: **P0, P1 and P2 approved** ([P2 report](phase-reports/P2.md)); the
-human real-keyboard check is still open. P3 not started. Q4 is with the faculty guide.
+human real-keyboard check is still open. P3 and P4 partly built ([P3-P4 note](phase-reports/P3-P4-slice.md)). Q4 settled
+(2026-10-27); the lead enters the values in `config/privacy.yaml → governance`.
 Repository: `C:\dev\integrity-exam`, outside any cloud-synced folder. Python is pinned to 3.11.
 
 Markers used in this document:
@@ -857,7 +858,7 @@ Exact section and rule numbers are to be verified before the consent notice is f
 
 | Role | Who |
 |---|---|
-| Data Fiduciary | the project under VIT, via the faculty guide **[OPEN: confirm]** |
+| Data Fiduciary | as settled in Q4 (D-042); shown in the notice from `config/privacy.yaml → governance.data_fiduciary` |
 | Data Principals | participants |
 | Processors | none: self-hosted, with no third-party analytics, CDNs or cloud APIs on the data path |
 
@@ -869,9 +870,10 @@ The consent screen and a downloadable notice state:
   academic decision.
 - **Data categories:** §10.4. This includes that recorded timing may be used to **simulate
   automated-typing attacks** against the system (A3b).
-- **Retention period.** **[OPEN]**
+- **Retention period.** From `config/privacy.yaml` (D-042); shown as "[to be set]" while blank.
 - **How to withdraw.** A withdraw button in the app, plus a contact address. Effect: collection
-  stops and data is erased (§10.7).
+  stops and data is erased (§10.7). Built (D-042): "Withdraw from the study" on the tasks page and the
+  participant's report, two steps; `POST /api/me/withdraw` closes live connections and erases.
 - **Contacts and grievance route**, including the Data Protection Board complaint route.
 - **Known false-flag causes** (§10.8).
 
@@ -907,7 +909,7 @@ same information as the code itself, and it is disclosed in the notice.
 
 - Pseudonyms are random: `P-` + 8 base32 characters.
 - The identity map (identity ↔ pseudonym) is held **offline** by one named custodian, never one
-  of the three students **[OPEN Q4: faculty guide to name]**. It is never in the app database,
+  of the three students, named in the governance one-pager (Q4, D-042). It is never in the app database,
   repository or reviewer tools.
 - Reviewers see pseudonyms only.
 - The participant keeps their pseudonym on the consent receipt, for withdrawal and appeals.
@@ -945,8 +947,9 @@ same information as the code itself, and it is disclosed in the notice.
 
 ### 10.7 Retention and erasure
 
-- **Retention job.** Raw logs are deleted N days after project end, with N set by the faculty guide
-  **[OPEN Q4]**. A job purges them on that date. Derived pseudonymised features follow the second
+- **Retention job.** Raw logs are deleted N days after project end, with N from `config/privacy.yaml`
+  (D-042). `scripts/purge_retention.py` (dry run unless `--apply`; refuses while values are blank)
+  erases every participant on or after that date, each through the normal erasure. Derived pseudonymised features follow the second
   retention answer in the governance one-pager.
 - **Erasure endpoint.** `DELETE /api/participants/{pseudonym}`, callable by the participant (with
   their token) or by an admin (with a request id). It deletes events, snapshots, features, scores,
@@ -1215,7 +1218,7 @@ See [DECISIONS.md](DECISIONS.md) for the full log.
 | Q1: repo and data location, Python | **Decided.** Repo in `C:\dev\integrity-exam`; data root outside the repo and encrypted; Python 3.11 pinned. |
 | Q2: where Run/Test executes | **Decided.** Pyodide in a Web Worker, Python only; results are client-reported and forgeable (§1.4). |
 | Q3: study protocol | **Decided with changes.** 50+ recruited; live-LLM A5 subset of 8–10; role-play and transcription-awareness limitations (§1.4); ethics approval before collection. |
-| Q4: data governance | **Open.** With the faculty guide via the governance one-pager: retention N, identity-map custodian, named responsible party, reviewers outside the team. |
+| Q4: data governance | **Settled with the faculty guide (2026-10-27, D-042).** The lead enters the values (responsible party, contact, project end date, both retention periods) in `config/privacy.yaml → governance`; the identity-map custodian is named in the governance one-pager only (§10.5). Real collection cannot be enabled while any value is blank. |
 | Q5: evaluation | **Decided with changes.** Nested user-level CV; cluster bootstrap over users; exact TypeNet protocol documented before P2 training (§12.7). |
 | P1 review | **Decided.** COOP/COEP by default, the same for all sessions, no accuracy claim (D-021). Chromium and Firefox only, same browser both sittings (D-025). Threat-model additions and mandatory P3 reconciliation (D-026). Replace disabled, `unknown` is a flag (D-027). Aalto licence requested by the lead. |
 | Field-key location and backup | **Decided (D-028).** Moved out of the repo; guarded; encrypted offline backup script (§10.6). The lead makes the first backup. |

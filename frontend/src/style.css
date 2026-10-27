@@ -377,3 +377,8 @@ button.task-done {
 .decision-cell { white-space: nowrap; }
 .chain-ok { color: var(--ok); }
 .chain-broken { color: var(--error); font-weight: 600; }
+
+/* Withdrawal (SPEC 10.3). */
+.withdraw { margin-top: 32px; }
+.withdraw summary { cursor: pointer; color: var(--muted); }
+button.danger { border-color: var(--error); color: var(--error); }

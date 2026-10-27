@@ -87,6 +87,17 @@ The first part of P4, built after "continue".
 - **Decision panel:** the exam's hash-chain check, with the caveat that it shows tampering after
   the server received the data, not what the browser sent.
 
+## Addition: governance, withdrawal and retention (D-042, 2026-10-27)
+
+- Q4 is settled and the consent draft accepted. The values have one home, `config/privacy.yaml →
+  governance`; the notice shows them, and "[to be set]" until the lead enters them. The backend
+  won't start with real collection on while any is blank.
+- **Withdraw:** "Withdraw from the study" (two steps) on the tasks page and the report. It closes
+  any live recording and erases everything; the access log records the withdrawal without the
+  pseudonym.
+- **Retention job:** `scripts/purge_retention.py`, dry run unless `--apply`; refuses while the
+  dates are blank. Derived features in the data root are reported as due, for manual deletion.
+
 ## How it's built
 
 | Part | Where |

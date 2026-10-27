@@ -4,6 +4,7 @@ import { api } from "../api";
 import { detectLayout } from "../capture/device";
 import { h } from "../dom";
 import { store, type SetupState } from "../state";
+import { withdrawPanel } from "./withdraw";
 
 const PROBLEMS: Array<{ id: string; kind: "practice" | "exam"; stage: "baseline" | "check" | "exam"; label: string }> = [
   { id: "practice_sum_evens", kind: "practice", stage: "baseline", label: "Practice 1: sum of even numbers" },
@@ -82,6 +83,7 @@ export async function setupPage(root: HTMLElement): Promise<void> {
       h("div", { class: "row" }, ...examButtons),
       done.has("exam_run_length") ? h("p", {}, h("a", { href: "#/my-report", id: "setup-report" }, "See your report")) : null,
       error,
+      withdrawPanel(participant),
     ),
   );
 }

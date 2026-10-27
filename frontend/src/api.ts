@@ -52,7 +52,7 @@ async function call<T>(path: string, init: RequestInit = {}, token?: string): Pr
 
 export const api = {
   health: () => call<{ status: string }>("/api/health"),
-  clientConfig: () => call<{ policy: EditorPolicy; capture: CaptureSettings }>("/api/client-config"),
+  clientConfig: () => call<{ policy: EditorPolicy; capture: CaptureSettings; notice: NoticeFields }>("/api/client-config"),
   problem: (id: string) => call<Problem>(`/api/problems/${id}`),
   createParticipant: (body: unknown) =>
     call<{ pseudonym: string; participant_token: string }>("/api/participants", { method: "POST", body: JSON.stringify(body) }),
@@ -62,6 +62,8 @@ export const api = {
   closeSession: (id: string, token: string) =>
     call<{ n_events: number; head_hash: string; signed: boolean }>(`/api/sessions/${id}/close`, { method: "POST" }, token),
   myReport: (participantToken: string) => call<Report>("/api/me/report", {}, participantToken),
+  withdraw: (participantToken: string) =>
+    call<{ erased: boolean; n_sessions: number; n_events: number }>("/api/me/withdraw", { method: "POST" }, participantToken),
   appeal: (sessionId: string, note: string, participantToken: string) =>
     call<{ id: number; at: string }>("/api/me/appeals", { method: "POST", body: JSON.stringify({ session_id: sessionId, note }) }, participantToken),
   staff: {
@@ -80,6 +82,13 @@ export const api = {
       ),
   },
 };
+
+/** Governance text for the consent notice (Q4), from config/privacy.yaml; "[to be set]" while blank. */
+export interface NoticeFields {
+  data_fiduciary: string;
+  contact: string;
+  retention: string;
+}
 
 export interface StaffEvent {
   server_seq: number;

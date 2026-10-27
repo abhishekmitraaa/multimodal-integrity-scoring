@@ -16,6 +16,7 @@ from fastapi import FastAPI, Header, HTTPException, Request, WebSocket, WebSocke
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from . import governance
 from .chain import verify_chain
 from .crypto import FieldCipher
 from .replay import replay
@@ -169,6 +170,7 @@ def load_keystroke_model(data_root: Path, model_file: str) -> tuple[Any, str]:
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or load_settings()
+    governance.validate(settings.privacy)       # no real collection without every Q4 value
     problems = load_problems()
     rcfg = report_config()
     keystroke_model: dict[str, Any] = {}
@@ -248,7 +250,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/api/client-config")
     async def client_config() -> dict[str, Any]:
         """Everything the capture client needs from config/, so the browser hard-codes nothing."""
-        return {"policy": policy, "capture": settings.capture}
+        return {"policy": policy, "capture": settings.capture, "notice": governance.notice_fields(settings.privacy)}
 
     @app.get("/api/problems/{problem_id}")
     async def problem(problem_id: str) -> dict[str, Any]:
@@ -260,7 +262,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def create_participant(body: ParticipantIn) -> dict[str, str]:
         if not body.age_confirmed:
             raise HTTPException(400, "participants must confirm they are 18 or older")
-        if body.kind == "real" and not settings.privacy["real_collection_enabled"]:
+        if body.kind == "real" and (not settings.privacy["real_collection_enabled"] or governance.missing(settings.privacy)):
             raise HTTPException(403, "real data collection is disabled until ethics approval")
         pseudonym, token = await store().create_participant(body.kind, body.consent.model_dump())
         return {"pseudonym": pseudonym, "participant_token": token}
@@ -369,6 +371,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         saved = await store().add_appeal(body.session_id, pseudonym, body.note)
         await store().log_access(pseudonym, "participant", "add_appeal", body.session_id)
         return saved
+
+    @app.post("/api/me/withdraw")
+    async def withdraw(authorization: str | None = Header(None)) -> dict[str, Any]:
+        """The participant withdraws: collection stops and all their data is erased (SPEC 10.3, 10.7).
+        The log entry names no pseudonym; the erasure_log tombstone keeps only its hash."""
+        pseudonym = await store().participant_by_token(_bearer(authorization))
+        if pseudonym is None:
+            raise HTTPException(403, "not authorised")
+        for sid in await store().session_ids_of(pseudonym):
+            live = app.state.active.pop(sid, None)     # removed first, so its handler writes no ws_close
+            if live is not None:
+                await live.close(code=4410)            # collection stops now
+        n_sessions, n_events = await store().erase_participant(pseudonym, "participant")
+        await store().log_access("participant", "participant", "withdraw_and_erase", "erased")
+        return {"erased": True, "n_sessions": n_sessions, "n_events": n_events}
 
     @app.get("/api/me/report")
     async def own_report(authorization: str | None = Header(None)) -> dict[str, Any]:

@@ -44,6 +44,12 @@ export const store = {
   /** Problems this tab's participant has submitted (for the setup page's checkmarks). */
   done: () => read<string[]>("done") ?? [],
   markDone: (problemId: string) => write("done", [...new Set([...(read<string[]>("done") ?? []), problemId])]),
+  /** After withdrawal: forget the participant, their sessions and progress in this tab. */
+  clearParticipant: () => {
+    for (const key of ["participant", "sessions", "done", "setup"]) {
+      try { sessionStorage.removeItem(key); } catch { /* storage blocked */ }
+    }
+  },
   staffToken: () => read<string>("staffToken"),
   setStaffToken: (t: string) => write("staffToken", t),
 };

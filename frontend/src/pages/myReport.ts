@@ -5,6 +5,7 @@ import { api, type ExamReport } from "../api";
 import { h } from "../dom";
 import { renderReport } from "../report/render";
 import { store } from "../state";
+import { withdrawPanel } from "./withdraw";
 
 function appealForm(ex: ExamReport, token: string, reload: () => Promise<void>): HTMLElement {
   const short = ex.session_id.slice(0, 8);
@@ -45,6 +46,7 @@ export async function myReportPage(root: HTMLElement): Promise<void> {
       main.replaceChildren(
         renderReport(report, { reviewExtra: (ex) => appealForm(ex, participant.token, load) }),
         h("p", {}, h("a", { href: "#/setup" }, "Back to the tasks")),
+        withdrawPanel(participant),
       );
     } catch (err) {
       main.replaceChildren(h("p", { class: "error" }, String(err)));

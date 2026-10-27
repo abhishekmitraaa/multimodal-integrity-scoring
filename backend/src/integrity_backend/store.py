@@ -413,6 +413,17 @@ class Store:
             rows = (await conn.execute(text("SELECT * FROM access_log ORDER BY id DESC LIMIT :n"), {"n": limit})).all()
         return [{"at": r.at.isoformat(), "actor": r.actor, "role": r.role, "action": r.action, "target": r.target} for r in rows]
 
+    async def session_ids_of(self, pseudonym: str) -> list[str]:
+        async with self.engine.connect() as conn:
+            rows = (await conn.execute(text("SELECT session_id FROM sessions WHERE pseudonym = :p"), {"p": pseudonym})).all()
+        return [str(r.session_id) for r in rows]
+
+    async def all_pseudonyms(self) -> list[str]:
+        """Every participant, withdrawn or not (for the retention job)."""
+        async with self.engine.connect() as conn:
+            rows = (await conn.execute(text("SELECT pseudonym FROM participants ORDER BY pseudonym"))).all()
+        return [str(r.pseudonym) for r in rows]
+
     async def erase_participant(self, pseudonym: str, actor: str) -> tuple[int, int]:
         requested = datetime.now(timezone.utc)
         async with self.engine.begin() as conn:
