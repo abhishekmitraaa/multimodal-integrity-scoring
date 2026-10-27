@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 from integrity_eval import fusion_dryrun as fd
-from integrity_eval.synthetic_sessions import ATTACKS, generate, key_of
+from integrity_eval.synthetic_sessions import ATTACKS, GENUINE_CONDITIONS, generate, key_of
 
 CFG = fd._cfg("eval")["fusion_dryrun"]
 
@@ -29,7 +29,7 @@ def _replay(events: list[dict[str, Any]]) -> str:
 
 def test_generated_sessions_are_consistent_and_labelled() -> None:
     _, sessions = generate(3, fd.practice_texts(), fd.EXAM_TEXT, CFG, seed=1)
-    assert {s.label for s in sessions} == {"practice", "genuine", *ATTACKS}
+    assert {s.label for s in sessions} == {"practice", *GENUINE_CONDITIONS, *ATTACKS}
     for s in sessions:
         times = [e["t_client_us"] for e in s.events]
         assert times == sorted(times)
@@ -57,7 +57,7 @@ def test_dry_run_keeps_the_rules(small: dict[str, Any]) -> None:
         for name in fd.INPUTS:
             assert f["weights"][name] <= 0.0                   # SPEC 7.4: more anomaly never raises S
         assert f["c"] in (0.01, 0.1, 1.0, 10.0) and 0 < f["tau"] < 1
-    assert set(small["sessions"]) == {"genuine", *ATTACKS}
+    assert set(small["sessions"]) == {*GENUINE_CONDITIONS, *ATTACKS}
     assert all(v["sessions"] == 10 for v in small["sessions"].values())
     cal = small["calibration"]
     assert 0 <= cal["ece"] <= 1 and 0 <= cal["brier"] <= 1 and sum(b["n"] for b in cal["reliability"]) == small["coverage"]["ticks"]

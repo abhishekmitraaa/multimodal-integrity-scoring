@@ -5,12 +5,19 @@ pauses, typos). Sessions are written in the stored-event shape the server keeps 
 content_change, paste, blur/focus, snapshot, run, submit), so every feature runs through the same
 code as on real data.
 
+Conditions, named as in the SPEC 9.3 catalogue:
 - practice: the three practice solutions, copy-typed (the baseline, D-035);
-- genuine exam: the exam solution typed by the same user while composing (more and longer pauses,
-  more corrections), which is why genuine exams differ from the baseline;
-- A1 external paste: the user types the start, leaves the window, then pastes the rest;
-- A3b auto-typer: the solution injected at a near-constant rhythm;
-- A4 copy-type by someone else: another synthetic user types the solution.
+- genuine: the exam solution typed by the same user while composing (more and longer pauses, more
+  corrections), which is why genuine exams differ from the baseline;
+- A8 (genuine, false-flag test): composing on a different keyboard (faster, longer holds);
+- A1: the user types the start, leaves the window, then pastes the rest from outside;
+- A2: an auto-typer at a near-constant rhythm;
+- A3a: an auto-typer with jitter drawn from population-like distributions;
+- A3b: an auto-typer with jitter resampled from this user's own practice timing;
+- A4: the user copy-types the solution with their own hands (practice behaviour, not composing);
+- IMP: impersonation (SPEC 9.4), another synthetic user types the exam.
+Not generated: A5 (edited LLM code) and A6/A7 (style, refactors): they need code variation, which
+this generator does not model.
 
 What this generator does NOT model, so the dry run cannot say anything about it: coding style
 (every user types the same text, so the AST inputs carry no signal), real keyboards and editors,
@@ -27,7 +34,8 @@ from typing import Any
 
 import numpy as np
 
-ATTACKS = ("A1", "A3b", "A4")
+ATTACKS = ("A1", "A2", "A3a", "A3b", "A4", "IMP")
+GENUINE_CONDITIONS = ("genuine", "A8")
 _SYMBOL_CODES = {
     "(": ("Digit9", "bracket"), ")": ("Digit0", "bracket"), "[": ("BracketLeft", "bracket"),
     "]": ("BracketRight", "bracket"), "{": ("BracketLeft", "bracket"), "}": ("BracketRight", "bracket"),
@@ -68,18 +76,29 @@ class Typist:
     pair_log_sd: float        # this user's deviation per key pair (their "habit")
     pause_p: float            # chance of a thinking pause before a line
     typo_p: float             # chance per character of a typo, then Backspace
-    constant: bool = False    # an auto-typer: no pauses, no typos, near-constant timing
+    mode: str = "human"       # human | constant (A2) | sampled (A3a, A3b: iid draws from flights/holds)
+    flights: tuple[float, ...] = ()
+    holds: tuple[float, ...] = ()
+
+    @property
+    def constant(self) -> bool:
+        """An auto-typer of any kind: no pauses, no typos."""
+        return self.mode != "human"
 
     def flight(self, prev: str, cur: str, rng: np.random.Generator) -> float:
-        if self.constant:
+        if self.mode == "constant":
             return self.flight_ms * (1 + rng.uniform(-0.01, 0.01)) / 1000
+        if self.mode == "sampled":
+            return float(rng.choice(self.flights))
         shared = 0.3 * _unit_normal("pair", prev, cur)                       # some pairs are harder for everyone
         own = self.pair_log_sd * _unit_normal(self.uid, prev, cur)           # and this user has their own habits
         return max(0.03, self.flight_ms * math.exp(shared + own + rng.normal(0, self.flight_log_sd)) / 1000)
 
     def hold(self, key: str, rng: np.random.Generator) -> float:
-        if self.constant:
+        if self.mode == "constant":
             return self.hold_ms * (1 + rng.uniform(-0.01, 0.01)) / 1000
+        if self.mode == "sampled":
+            return float(rng.choice(self.holds))
         return max(0.02, self.hold_ms * math.exp(0.15 * _unit_normal("hold", key) + 0.2 * _unit_normal(self.uid, key)
                                                  + rng.normal(0, self.hold_log_sd)) / 1000)
 
@@ -98,7 +117,41 @@ def sample_typist(uid: str, rng: np.random.Generator, cfg: dict[str, Any]) -> Ty
 
 
 def auto_typer(cfg: dict[str, Any]) -> Typist:
-    return Typist("auto-typer", cfg["auto_typer_flight_ms"], cfg["auto_typer_hold_ms"], 0, 0, 0, 0, 0, constant=True)
+    """A2: near-constant rhythm."""
+    return Typist("auto-typer", cfg["auto_typer_flight_ms"], cfg["auto_typer_hold_ms"], 0, 0, 0, 0, 0, mode="constant")
+
+
+def population_typer(cfg: dict[str, Any], rng: np.random.Generator, n: int = 2000) -> Typist:
+    """A3a: iid jitter from population-like log-normal distributions (no key-pair structure)."""
+    flights = tuple(cfg["base_flight_ms"] / 1000 * np.exp(rng.normal(0, cfg["population_flight_log_sd"], n)))
+    holds = tuple(cfg["base_hold_ms"] / 1000 * np.exp(rng.normal(0, cfg["population_hold_log_sd"], n)))
+    return Typist("population-typer", 0, 0, 0, 0, 0, 0, 0, mode="sampled", flights=flights, holds=holds)
+
+
+def own_timing_typer(practice_events: list[list[dict[str, Any]]], pause_s: float) -> Typist:
+    """A3b: iid resampling of this user's own practice flights (under pause_s) and holds."""
+    flights: list[float] = []
+    holds: list[float] = []
+    for events in practice_events:
+        prev = None
+        downs: dict[str, float] = {}
+        for e in events:
+            t = e["t_client_us"] / 1e6
+            if e["type"] == "keydown":
+                if prev is not None and t - prev < pause_s:
+                    flights.append(t - prev)
+                prev = t
+                downs[e["data"]["code"]] = t
+            elif e["type"] == "keyup" and e["data"]["code"] in downs:
+                holds.append(t - downs.pop(e["data"]["code"]))
+    return Typist("own-timing-typer", 0, 0, 0, 0, 0, 0, 0, mode="sampled", flights=tuple(flights), holds=tuple(holds))
+
+
+def other_keyboard(u: Typist, rng: np.random.Generator, cfg: dict[str, Any]) -> Typist:
+    """A8: the same person on a different keyboard: speed and holds shift, and its key pairs differ."""
+    return Typist(u.uid + "-kb2", u.flight_ms * float(rng.uniform(*cfg["a8_speed_factor"])),
+                  u.hold_ms * float(rng.uniform(*cfg["a8_hold_factor"])), u.flight_log_sd, u.hold_log_sd,
+                  u.pair_log_sd, u.pause_p, u.typo_p)
 
 
 @dataclass
@@ -197,18 +250,26 @@ def generate(users: int, practice_texts: dict[str, str], exam_text: str, cfg: di
     rng = np.random.default_rng(seed)
     typists = [sample_typist(f"SYN-U{i:03d}", rng, cfg) for i in range(users)]
     sessions: list[Session] = []
+    population = population_typer(cfg, rng)
     for i, u in enumerate(typists):
+        practice_events = []
         for pid, text in practice_texts.items():
             w = _Writer(rng)
             w.snapshot("segment_start")
             w.type_text(u, text)
-            sessions.append(Session(u.uid, "practice", "practice", pid, w.finish()))
+            practice_events.append(w.finish())
+            sessions.append(Session(u.uid, "practice", "practice", pid, practice_events[-1]))
         composing = dict(pause_scale=cfg["composing_pause_scale"], typo_scale=cfg["composing_typo_scale"],
                          pause_s=tuple(cfg["composing_pause_s"]))
         w = _Writer(rng)
         w.snapshot("segment_start")
         w.type_text(u, exam_text, **composing)
         sessions.append(Session(u.uid, "exam", "genuine", "exam", w.finish()))
+
+        w = _Writer(rng)                                           # A8: genuine, other keyboard
+        w.snapshot("segment_start")
+        w.type_text(other_keyboard(u, rng, cfg), exam_text, **composing)
+        sessions.append(Session(u.uid, "exam", "A8", "exam", w.finish()))
 
         # A1: types the start, leaves the window, pastes the rest from outside the editor
         cut = int(len(exam_text) * cfg["a1_typed_share"])
@@ -221,18 +282,19 @@ def generate(users: int, practice_texts: dict[str, str], exam_text: str, cfg: di
         w.paste(exam_text[cut:])
         sessions.append(Session(u.uid, "exam", "A1", "exam", w.finish(), onset_s=onset))
 
-        # A3b: an auto-typer injects the whole solution
-        w = _Writer(rng)
-        w.snapshot("segment_start")
-        start = w.t
-        w.type_text(auto_typer(cfg), exam_text)
-        sessions.append(Session(u.uid, "exam", "A3b", "exam", w.finish(), onset_s=start))
-
-        # A4: someone else copy-types the solution
+        # Whole-session conditions: the attack starts with the session.
         other = typists[(i + 1 + int(rng.integers(users - 1))) % users]
-        w = _Writer(rng)
-        w.snapshot("segment_start")
-        start = w.t
-        w.type_text(other, exam_text)
-        sessions.append(Session(u.uid, "exam", "A4", "exam", w.finish(), onset_s=start))
+        whole = {
+            "A2": auto_typer(cfg),
+            "A3a": population,
+            "A3b": own_timing_typer(practice_events, cfg["a3b_flight_max_s"]),
+            "A4": u,                                               # own hands, copy-typing (practice behaviour)
+            "IMP": other,                                          # someone else
+        }
+        for label, typist in whole.items():
+            w = _Writer(rng)
+            w.snapshot("segment_start")
+            start = w.t
+            w.type_text(typist, exam_text)
+            sessions.append(Session(u.uid, "exam", label, "exam", w.finish(), onset_s=start))
     return typists, sessions

@@ -13,7 +13,7 @@ so with inactive constraints the two give the same fit (tested).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Any, Sequence
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -91,7 +91,9 @@ def fit_fusion(
         bounds=bounds,
         options={"maxiter": 10_000, "gtol": 1e-10, "ftol": 1e-14},
     )
-    if not result.success:
+    if not result.success and _projected_gradient(objective, result.x, bounds) > 1e-6 * max(1.0, c * n):
+        # L-BFGS-B can stop with ABNORMAL at the precision limit of these tight tolerances while
+        # already optimal; only a non-zero projected gradient means it really did not converge.
         raise RuntimeError(f"fusion fit did not converge: {result.message}")
 
     coef = np.asarray(result.x[:d], dtype=np.float64)
@@ -107,6 +109,15 @@ def fit_fusion(
     )
     assert_weight_signs(model)
     return model
+
+
+def _projected_gradient(objective: Any, x: FloatArray, bounds: Sequence[tuple[float | None, float | None]]) -> float:
+    """Largest gradient component that could still lower the objective inside the bounds (0 at a KKT point)."""
+    _, g = objective(x)
+    lo = np.array([-np.inf if b[0] is None else b[0] for b in bounds])
+    hi = np.array([np.inf if b[1] is None else b[1] for b in bounds])
+    blocked = ((x >= hi) & (g < 0)) | ((x <= lo) & (g > 0))
+    return float(np.abs(np.where(blocked, 0.0, g)).max())
 
 
 def assert_weight_signs(model: FusionModel) -> None:

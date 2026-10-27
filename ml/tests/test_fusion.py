@@ -5,6 +5,8 @@ All data here is SYNTHETIC, generated from seeded RNGs with a known orientation.
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pytest
 from numpy.typing import NDArray
@@ -123,3 +125,30 @@ def test_rejects_bad_labels_and_shapes() -> None:
         fit_fusion(x, y * 2, NAMES, MASK)
     with pytest.raises(ValueError):
         fit_fusion(x, y, NAMES[:2], MASK)
+
+
+def test_a_precision_stop_at_the_optimum_is_accepted_but_a_real_failure_is_not(monkeypatch: Any) -> None:
+    import integrity_ml.fusion as fu
+    from scipy.optimize import minimize as real_minimize
+
+    rng = np.random.default_rng(3)
+    x = rng.normal(size=(200, 2))
+    y = (x[:, 0] + rng.normal(size=200) < 0).astype(float)
+
+    def precision_stop(*args: Any, **kw: Any) -> Any:          # optimal, but reported like L-BFGS-B's ABNORMAL
+        r = real_minimize(*args, **kw)
+        r.success, r.message = False, "ABNORMAL: "
+        return r
+
+    monkeypatch.setattr(fu, "minimize", precision_stop)
+    model = fu.fit_fusion(x, y, ["d1", "d2"], [True, True])
+    assert model.coef[0] < 0
+
+    def gave_up(*args: Any, **kw: Any) -> Any:                  # stopped at the start: far from optimal
+        r = real_minimize(*args, **{**kw, "options": {"maxiter": 0}})
+        r.success, r.message = False, "STOP: TOTAL NO. OF ITERATIONS REACHED LIMIT"
+        return r
+
+    monkeypatch.setattr(fu, "minimize", gave_up)
+    with pytest.raises(RuntimeError, match="did not converge"):
+        fu.fit_fusion(x, y, ["d1", "d2"], [True, True])

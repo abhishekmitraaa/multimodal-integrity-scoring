@@ -40,7 +40,7 @@ from integrity_ml.session_features import editor_keystrokes, enrollment_windows,
 from integrity_ml.smoothing import ewma_logit
 
 from .manifest import REPO_ROOT, run_manifest
-from .synthetic_sessions import ATTACKS, Session, generate
+from .synthetic_sessions import ATTACKS, GENUINE_CONDITIONS, Session, generate
 
 INPUTS = ("d_ks", "d_proc", "d_ast_h", "d_ast_s", "clip_ext_frac", "clip_ext_chars_log", "focus_loss_frac")
 AVAILABILITY = ("ks_available", "ast_available")
@@ -325,7 +325,7 @@ def run(cfg: Mapping[str, Any], seed: int, embedder: Any, users: int | None = No
         for val in inner:
             model, x, idx = fit_on(train_users - val, best)(val)
             for sid, (_, sm) in session_scores(model, x, [ticks[i] for i in idx], lam).items():
-                if exams[sid].label == "genuine":
+                if exams[sid].label == "genuine":     # tau from plain genuine sessions; A8 is reported, not tuned on
                     oof.append(float(sm.min()))
         tau = float(np.quantile(oof, ffr))
         model, x, idx = fit_on(train_users, best)(test)
@@ -360,7 +360,7 @@ def _session_summary(outcomes: Sequence[Mapping[str, Any]], resamples: int, seed
     users = sorted({o["uid"] for o in outcomes})
     rng = np.random.default_rng(seed + 1)
     picks = rng.integers(0, len(users), size=(resamples, len(users)))
-    for kind in ("genuine", *ATTACKS):
+    for kind in (*GENUINE_CONDITIONS, *ATTACKS):
         rows = [o for o in outcomes if o["attack"] == kind]
         flagged = np.array([sum(o["flagged"] for o in rows if o["uid"] == u) for u in users], dtype=np.float64)
         total = np.array([sum(1 for o in rows if o["uid"] == u) for u in users], dtype=np.float64)
@@ -368,7 +368,7 @@ def _session_summary(outcomes: Sequence[Mapping[str, Any]], resamples: int, seed
         ttd = [o["ttd_s"] for o in rows if o["ttd_s"] is not None]
         out[kind] = {"sessions": len(rows), "flagged_rate": round(float(flagged.sum() / max(total.sum(), 1)), 3),
                      "ci95": [round(float(np.quantile(boot, 0.025)), 3), round(float(np.quantile(boot, 0.975)), 3)],
-                     "median_ttd_s": round(float(np.median(ttd)), 1) if ttd and kind != "genuine" else None}
+                     "median_ttd_s": round(float(np.median(ttd)), 1) if ttd and kind in ATTACKS else None}
     return out
 
 
@@ -397,7 +397,9 @@ def render(r: Mapping[str, Any], manifest_md: str) -> str:
     for kind, v in r["sessions"].items():
         lines.append(f"| {kind} | {v['sessions']} | {v['flagged_rate']:.1%} | {v['ci95'][0]:.1%}–{v['ci95'][1]:.1%} | "
                      + (f"{v['median_ttd_s']} s" if v["median_ttd_s"] is not None else "–") + " |")
-    lines += ["", "\"genuine\" is the false-flag rate (target 5%, tau set on out-of-fold genuine training sessions).", "",
+    lines += ["", "Rows genuine and A8 are false flags (target 5% on genuine; tau set on out-of-fold genuine training "
+              "sessions). The others are detection rates. Conditions follow SPEC 9.3; IMP is impersonation "
+              "(SPEC 9.4). A5, A6 and A7 are not generated (they need code variation).", "",
               "## Folds", "", "| Fold | C | tau | Distance weights pinned at 0 |", "|---|---|---|---|"]
     lines += [f"| {f['fold']} | {f['c']} | {f['tau']} | {', '.join(f['pinned_at_zero']) or '–'} |" for f in r["folds"]]
     lines += ["", "Weights (last fold): " + ", ".join(f"{k} {v}" for k, v in r["folds"][-1]["weights"].items()), "",
