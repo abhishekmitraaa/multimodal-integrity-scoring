@@ -16,6 +16,7 @@ process:
   min_keydowns: 50
   min_typed_chars: 30           # [PROPOSED] below this, rates (per 100 typed chars) are unavailable
   max_changes: 50000            # [PROPOSED] bound on content changes tracked for survival/linearity
+  max_doc_units: 200000         # [PROPOSED] bound on the tracked document (UTF-16 units); offsets are client data
 ast:
   language: python
   laplace_alpha: 0.5             # [PROPOSED] ablate 0.1, 0.5, 1.0

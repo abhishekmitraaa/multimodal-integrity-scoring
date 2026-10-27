@@ -155,7 +155,7 @@ def test_thin_input_is_unavailable_and_tracking_is_bounded() -> None:
 
 def test_snapshot_resynchronises_after_a_lost_change() -> None:
     log = Log().keys(40)
-    log._add("snapshot", {"text": "x" * 45, "len": 45, "reason": "resync"})
+    log._add("snapshot", {"text": "x" * 45, "len": 999_999_999, "reason": "resync"})     # the text counts, not "len"
     log.doc = log.cursor = 45
     log.keys(40)
     f = process_features(log.events, CFG)
@@ -175,3 +175,20 @@ def test_baseline_pooled_sd_and_distance() -> None:
     assert process_distance(np.full(n, np.nan), b, s) is None
     v = vector(process_features(Log().keys(100).events, CFG))
     assert v.shape == (n,) and np.isnan(v[FEATURES.index("pre_burst_pause")])
+
+
+def test_forged_offsets_and_sizes_never_allocate_and_stop_tracking() -> None:
+    import tracemalloc
+
+    log = Log().keys(60)
+    log._change(10**9, 0, "a")                                         # offset far beyond any document
+    log._add("snapshot", {"text": "x", "len": 10**9, "reason": "resync"})
+    tracemalloc.start()
+    f = process_features(log.events, CFG)
+    peak = tracemalloc.get_traced_memory()[1]
+    tracemalloc.stop()
+    assert peak < 50_000_000                                           # no billion-element list
+    assert f["linearity"] is None and f["short_survival"] is None      # tracking stopped: said, not guessed
+    assert f["revision_rate"] == 0.0
+    big = process_features(Log().keys(100).events, ProcessConfig(max_doc_units=50))
+    assert big["linearity"] is None

@@ -8,8 +8,9 @@ Choices where SPEC 6.2 leaves room [PROPOSED, config/features.yaml → process]:
 - "typed chars" in a burst are character keydowns (letter, digit, symbol, bracket, whitespace);
 - flight_cv and hold_cv use intervals shorter than the burst gap (pauses are pause_frac's job);
 - linearity counts typed chars that follow an earlier insertion (the first one has no frontier);
-- survival and linearity track at most max_changes content changes per session (bounded cost
-  on a forged log); beyond that they are reported unavailable, not guessed.
+- survival and linearity track at most max_changes content changes and a document of at most
+  max_doc_units UTF-16 units (bounded cost and memory on a forged log: offsets and lengths come
+  from the client); beyond that they are reported unavailable, not guessed.
 
 The distance to the baseline needs per-feature scales s_k, the pooled within-user SD from
 training users (study data): pooled_within_sd() fits them, process_distance() uses them.
@@ -44,13 +45,14 @@ class ProcessConfig:
     min_keydowns: int = 50
     min_typed_chars: int = 30
     max_changes: int = 50_000
+    max_doc_units: int = 200_000
 
     @classmethod
     def from_config(cls, process: Mapping[str, Any]) -> "ProcessConfig":
         short_ms, long_ms = process["pause_thresholds_ms"]
         return cls(short_ms / 1000, long_ms / 1000, process["burst_gap_ms"] / 1000, int(process["large_burst_min_chars"]),
                    float(process["speed_bin_s"]), int(process["min_keydowns"]), int(process["min_typed_chars"]),
-                   int(process["max_changes"]))
+                   int(process["max_changes"]), int(process["max_doc_units"]))
 
 
 def _utf16_units(text: str) -> int:
@@ -67,17 +69,25 @@ def _median(x: Sequence[float]) -> float | None:
     return float(np.median(x)) if len(x) else None
 
 
+class _DocTooLarge(Exception):
+    pass
+
+
 class _Doc:
     """The document as one tag per UTF-16 unit: the time a typed unit was inserted, or None.
 
     Enough to tell, on a deletion, which typed characters are removed and when they were typed.
-    Out-of-range changes (a lost event) resynchronise to an untracked document of the new length.
+    Out-of-range changes (a lost event) resynchronise to an untracked document. Never larger than
+    max_units: offsets and lengths come from the client and are not trusted (_DocTooLarge).
     """
 
-    def __init__(self) -> None:
+    def __init__(self, max_units: int) -> None:
         self.tags: list[float | None] = []
+        self.max_units = max_units
 
     def apply(self, offset: int, del_len: int, ins: int, typed_at: float | None) -> list[float | None]:
+        if offset > self.max_units or ins > self.max_units or len(self.tags) - min(del_len, len(self.tags)) + ins > self.max_units:
+            raise _DocTooLarge
         if offset + del_len > len(self.tags):
             removed: list[float | None] = []
             self.tags = self.tags[:offset] + [None] * max(0, offset - len(self.tags))
@@ -88,6 +98,8 @@ class _Doc:
         return removed
 
     def reset(self, length: int) -> None:
+        if length > self.max_units:
+            raise _DocTooLarge
         self.tags = [None] * length
 
 
@@ -112,7 +124,7 @@ def process_features(events: Sequence[Event], cfg: ProcessConfig,
     linear = linear_den = 0         # linearity over typed chars that follow an earlier insertion
     frontier: int | None = None
     typed_units = typed_then_deleted = 0
-    doc = _Doc()
+    doc = _Doc(cfg.max_doc_units)
     changes = 0
     tracked = True
     group: list[Mapping[str, Any]] = []
@@ -126,12 +138,19 @@ def process_features(events: Sequence[Event], cfg: ProcessConfig,
             off, dl, text, cause = int(d["offset"]), int(d["del_len"]), str(d["text"]), str(d["cause"])
             units = _utf16_units(text)
             if d.get("flush"):
-                doc.reset(units)
+                if tracked:
+                    try:
+                        doc.reset(units)
+                    except _DocTooLarge:
+                        tracked, doc.tags = False, []
                 frontier = None
                 continue
             is_typed = cause == "typed"
             if tracked:
-                removed = doc.apply(off, dl, units, t if is_typed and inside(t) else None)
+                try:
+                    removed = doc.apply(off, dl, units, t if is_typed and inside(t) else None)
+                except _DocTooLarge:                  # forged or absurd sizes: stop tracking, never allocate
+                    tracked, doc.tags, removed = False, [], []
                 if inside(t):
                     typed_then_deleted += sum(1 for r in removed if r is not None)
             if inside(t):
@@ -160,9 +179,12 @@ def process_features(events: Sequence[Event], cfg: ProcessConfig,
         elif e["type"] == "snapshot":
             if group:
                 apply_group(t)
-            n = int(d.get("len", len(doc.tags)))
-            if n != len(doc.tags):                                    # resynchronise (reload, lost event)
-                doc.reset(n)
+            n = _utf16_units(str(d.get("text", "")))                  # the text itself, not the client's "len"
+            if tracked and n != len(doc.tags):                        # resynchronise (reload, lost event)
+                try:
+                    doc.reset(n)
+                except _DocTooLarge:
+                    tracked, doc.tags = False, []
                 frontier = None
         elif e["type"] in ("keydown", "keyup") and d.get("target", "editor") == "editor":
             if inside(t):
