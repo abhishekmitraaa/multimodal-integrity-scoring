@@ -10,7 +10,7 @@ import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Sequence, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
@@ -82,14 +82,26 @@ class Store:
 
     # ---- participants and sessions -------------------------------------------------------
 
-    async def create_participant(self, kind: str, consent: dict[str, Any]) -> tuple[str, str]:
+    async def create_participant(self, kind: str, consent: dict[str, Any],
+                                 study_plan: Callable[[int], Sequence[tuple[int, str, str]]] | None = None) -> tuple[str, str]:
+        """With study_plan, the participant joins the study protocol (D-046): their sitting-2 plan is
+        study_plan(row), row = how many study participants exist (Latin-square rows in turn)."""
         pseudonym = self.prefixes[kind] + "".join(secrets.choice(CROCKFORD) for _ in range(8))
         token = secrets.token_urlsafe(32)
         async with self.engine.begin() as conn:
+            row = None
+            if study_plan is not None:
+                await conn.execute(text("LOCK TABLE study_assignments IN SHARE ROW EXCLUSIVE MODE"))   # rows in turn
+                row = (await conn.execute(text("SELECT count(*) AS n FROM participants WHERE study_protocol"))).one().n
             await conn.execute(
-                text("INSERT INTO participants (pseudonym, kind, token_sha256) VALUES (:p, :k, :t)"),
-                {"p": pseudonym, "k": kind, "t": sha256(token)},
+                text("INSERT INTO participants (pseudonym, kind, token_sha256, study_protocol) VALUES (:p, :k, :t, :s)"),
+                {"p": pseudonym, "k": kind, "t": sha256(token), "s": study_plan is not None},
             )
+            if study_plan is not None:
+                for slot, problem_id, condition in study_plan(int(row)):
+                    await conn.execute(text("INSERT INTO study_assignments (pseudonym, slot, problem_id, condition) "
+                                            "VALUES (:p, :s, :pr, :c)"),
+                                       {"p": pseudonym, "s": slot, "pr": problem_id, "c": condition})
             await conn.execute(
                 text(
                     "INSERT INTO consent_records (pseudonym, notice_version, notice_sha256, choices) "
@@ -108,6 +120,56 @@ class Store:
                 )
             ).first()
         return None if row is None else str(row.pseudonym)
+
+    # ---- study protocol (D-046) -------------------------------------------------------------
+
+    async def participant_info(self, pseudonym: str) -> dict[str, Any] | None:
+        async with self.engine.connect() as conn:
+            row = (await conn.execute(text("SELECT kind, study_protocol FROM participants WHERE pseudonym = :p"),
+                                      {"p": pseudonym})).first()
+        return None if row is None else {"kind": row.kind, "study_protocol": bool(row.study_protocol)}
+
+    async def study_plan(self, pseudonym: str) -> list[dict[str, Any]]:
+        """Slots with their session (if any) and whether it is submitted. Scripted sessions are not slots."""
+        async with self.engine.connect() as conn:
+            rows = (await conn.execute(text(
+                "SELECT a.slot, a.problem_id, a.condition, s.session_id, s.closed_at "
+                "FROM study_assignments a LEFT JOIN sessions s ON s.pseudonym = a.pseudonym AND s.problem_id = a.problem_id "
+                "AND NOT EXISTS (SELECT 1 FROM study_labels l WHERE l.session_id = s.session_id AND l.scripted) "
+                "WHERE a.pseudonym = :p ORDER BY a.slot"), {"p": pseudonym})).all()
+        return [{"slot": r.slot, "problem_id": r.problem_id, "condition": r.condition,
+                 "session_id": str(r.session_id) if r.session_id else None, "done": r.closed_at is not None} for r in rows]
+
+    async def first_practice(self, pseudonym: str) -> tuple[str | None, datetime] | None:
+        """(browser brand, start time) of the participant's first practice session: sitting 1."""
+        async with self.engine.connect() as conn:
+            row = (await conn.execute(text("SELECT browser_brand, created_at FROM sessions WHERE pseudonym = :p AND kind = 'practice' "
+                                           "ORDER BY created_at LIMIT 1"), {"p": pseudonym})).first()
+        return None if row is None else (row.browser_brand, row.created_at)
+
+    async def study_label(self, session_id: str) -> dict[str, Any] | None:
+        async with self.engine.connect() as conn:
+            row = (await conn.execute(text("SELECT condition, scripted, onset_client_us, onset_at FROM study_labels "
+                                           "WHERE session_id = CAST(:s AS uuid)"), {"s": session_id})).first()
+        return None if row is None else {"condition": row.condition, "scripted": row.scripted,
+                                         "onset_client_us": row.onset_client_us, "onset_at": row.onset_at}
+
+    async def set_onset(self, session_id: str, onset_client_us: int) -> bool:
+        """Records the attack onset once; False if it was already set."""
+        async with self.engine.begin() as conn:
+            n = (await conn.execute(text("UPDATE study_labels SET onset_client_us = :t, onset_at = now() "
+                                         "WHERE session_id = CAST(:s AS uuid) AND onset_at IS NULL"),
+                                    {"s": session_id, "t": onset_client_us})).rowcount
+        return n == 1
+
+    async def assign_condition(self, pseudonym: str, slot: int, condition: str) -> bool:
+        """Researcher override of a slot (A8: a genuine task on another keyboard), only before it is started."""
+        async with self.engine.begin() as conn:
+            n = (await conn.execute(text(
+                "UPDATE study_assignments a SET condition = :c WHERE a.pseudonym = :p AND a.slot = :s AND NOT EXISTS "
+                "(SELECT 1 FROM sessions s WHERE s.pseudonym = a.pseudonym AND s.problem_id = a.problem_id)"),
+                {"p": pseudonym, "s": slot, "c": condition})).rowcount
+        return n == 1
 
     # ---- named staff accounts (D-044) -------------------------------------------------------
 
@@ -142,7 +204,8 @@ class Store:
                  "disabled_at": r.disabled_at.isoformat() if r.disabled_at else None} for r in rows]
 
     async def create_session(self, pseudonym: str, kind: str, problem_id: str,
-                             at_most_once_among: Sequence[str] = ()) -> tuple[str, str]:
+                             at_most_once_among: Sequence[str] = (), env: Mapping[str, Any] | None = None,
+                             label: tuple[str, bool] | None = None) -> tuple[str, str]:
         """With at_most_once_among, refuse (SessionLimitError) if the participant already has a session
         for any of those problems. The participant row is locked, so two concurrent requests cannot
         both pass the check (security review of D-038)."""
@@ -157,16 +220,24 @@ class Store:
                     {"p": pseudonym, "ids": list(at_most_once_among)})).one()
                 if existing.n > 0:
                     raise SessionLimitError(problem_id)
+            env = env or {}
             await conn.execute(
                 text(
-                    "INSERT INTO sessions (session_id, pseudonym, kind, problem_id, nonce, token_sha256, head_hash) "
-                    "VALUES (:s, :p, :k, :pr, :n, :t, :h)"
+                    "INSERT INTO sessions (session_id, pseudonym, kind, problem_id, nonce, token_sha256, head_hash, "
+                    "browser_brand, browser_version, cross_origin_isolated) "
+                    "VALUES (:s, :p, :k, :pr, :n, :t, :h, :bb, :bv, :coi)"
                 ),
                 {
                     "s": session_id, "p": pseudonym, "k": kind, "pr": problem_id,
                     "n": nonce, "t": sha256(token), "h": genesis(session_id, nonce),
+                    "bb": env.get("browser_brand"), "bv": env.get("browser_version"), "coi": env.get("cross_origin_isolated"),
                 },
             )
+            if label is not None:                     # study condition (D-046); never read by scoring or reviewers
+                condition, scripted = label
+                await conn.execute(text("INSERT INTO study_labels (session_id, condition, scripted, onset_at) "
+                                        "VALUES (:s, :c, :sc, CASE WHEN :sc THEN now() END)"),
+                                   {"s": session_id, "c": condition, "sc": scripted})
         return session_id, token
 
     async def session_by_token(self, session_id: str, token: str) -> SessionRow | None:

@@ -1108,6 +1108,11 @@ The full design follows.
 - **Onset.** Condition labels and attack onset times are recorded by the study tooling and never
   reach the scoring path.
 - **Role-play.** Participants are told that attack conditions are role-play with no consequences.
+- **Built (D-046).** `config/study.yaml`; Williams Latin square over the six sitting-2 tasks; frozen LLM
+  solutions in `backend/study_materials/` (provenance-checked); conditions and onsets in `study_labels`,
+  never read by scoring or reviewers; sitting rules (browser, isolation, same brand, >= 20 h gap) enforced
+  for study participants; scripted A2/A3 sessions via `/api/admin/scripted-session` and
+  `eval/tools/attack_runner`.
 
 The transcription-mode profile is a hypothesis: it may help separate *this student's*
 composition from *this student's* transcription (A4). It is tested, not assumed.

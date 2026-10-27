@@ -27,6 +27,7 @@ You can withdraw at any time, without giving a reason: use "Withdraw from the st
 
 export function consentPage(root: HTMLElement): void {
   const kind = new URLSearchParams(location.search).get("kind") === "synthetic" ? "synthetic" : "dev";
+  const studyOptIn = new URLSearchParams(location.search).get("study") === "1";      // dev testers try the study protocol
   let notice = noticeText(UNSET);
   const noticeEl = h("pre", { class: "notice", id: "notice" }, notice);
   api.clientConfig().then((c) => { notice = noticeText(c.notice); noticeEl.textContent = notice; }, () => undefined);
@@ -43,6 +44,7 @@ export function consentPage(root: HTMLElement): void {
       try {
         const res = await api.createParticipant({
           kind,
+          study: studyOptIn,
           age_confirmed: true,
           consent: { notice_version: NOTICE_VERSION, notice_sha256: await sha256Hex(notice), choices: { participation: true } },
         });

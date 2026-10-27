@@ -1,0 +1,13 @@
+# Study protocol (SPEC 12.2), D-046. Applies to participants in the study protocol: every real
+# participant, and dev participants who opt in (?study=1) to test it.
+sitting2_tasks: [exam_run_length, exam_second_largest, exam_balanced, exam_top_word, exam_merge_sorted, exam_caesar]
+conditions: [genuine, genuine, A1, A4, A5, A7]   # [BRIEF] one per task; order by a Williams Latin square
+scripted_conditions: [A2, A3a, A3b]              # run by eval/tools/attack_runner on the participant's behalf
+optional_conditions: [A8]                        # researcher-assigned: a genuine task on a different keyboard
+min_sitting_gap_hours: 20                        # [PROPOSED] sitting 2 ">= 1 day later"; 20 h allows same-time-next-day slots
+gap_applies_to: [real]                           # dev testers can run both sittings at once
+allowed_browsers: [chrome, edge, firefox]        # D-025; the same brand in both sittings
+require_cross_origin_isolation: true             # D-021
+a2: {flight_ms: 110, jitter: 0.01, hold_ms: 55}                                   # constant-rate auto-typer
+a3a: {flight_median_ms: 190, flight_log_sd: 0.45, hold_median_ms: 95, hold_log_sd: 0.25}   # [PROPOSED] population-like jitter
+a3b: {flight_max_s: 2.0}                         # resample the participant's own practice flights below this

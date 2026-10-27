@@ -10,6 +10,7 @@ import { h } from "../dom";
 import { checkPolicy, createEditor, monaco } from "../editor";
 import { PyRunner } from "../runner/runner";
 import { store } from "../state";
+import { roleplayCard } from "./study";
 
 export async function sessionPage(root: HTMLElement, sessionId: string): Promise<void> {
   const ref = store.session(sessionId);
@@ -18,10 +19,11 @@ export async function sessionPage(root: HTMLElement, sessionId: string): Promise
     root.replaceChildren(h("main", { class: "narrow" }, h("p", {}, "This session is not open in this tab.")));
     return;
   }
-  const [config, problem, state] = await Promise.all([
+  const [config, problem, state, roleplay] = await Promise.all([
     api.clientConfig(),
     api.problem(ref.problemId),
     api.sessionState(sessionId, ref.token),
+    ref.kind === "exam" ? roleplayCard(sessionId, participant.token) : Promise.resolve(null),
   ]);
   const cap = config.capture;
 
@@ -39,6 +41,7 @@ export async function sessionPage(root: HTMLElement, sessionId: string): Promise
     ]
     : [];
   const panel = h("section", { class: "problem", id: "problem" },
+    roleplay,
     h("h2", {}, problem.title),
     h("p", { class: "statement" }, problem.statement),
     ...reference,

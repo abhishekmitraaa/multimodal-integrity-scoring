@@ -10,7 +10,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG_DIR = ROOT / "config"
-EXPECTED = {"global", "capture", "editor_policy", "features", "models", "scoring", "eval", "privacy"}
+EXPECTED = {"global", "capture", "editor_policy", "features", "models", "scoring", "eval", "privacy", "study"}
 
 
 def cfg(name: str) -> dict[str, Any]:

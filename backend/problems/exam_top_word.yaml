@@ -1,0 +1,15 @@
+id: exam_top_word
+kind: exam
+stage: exam
+title: Most frequent word
+statement: |
+  Write a function `top_word(text)` that returns the most frequent word in `text`, in lower case.
+  Words are separated by spaces. If several words are equally frequent, return the one that comes
+  first alphabetically. For example `top_word("b a B a c")` is `"a"`.
+starter: |
+  def top_word(text):
+      pass
+tests:
+  - {call: "top_word('b a B a c')", expected: "'a'"}
+  - {call: "top_word('Cat dog cat Dog')", expected: "'cat'"}
+  - {call: "top_word('one')", expected: "'one'"}

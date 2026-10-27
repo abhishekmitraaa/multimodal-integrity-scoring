@@ -8,15 +8,18 @@ import hmac
 import itertools
 import json
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, AsyncIterator, Literal
 
 import yaml
 from fastapi import FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
+from integrity_ml.session_features import editor_keystrokes
 from sqlalchemy.ext.asyncio import create_async_engine
+from starlette.requests import ClientDisconnect
 
-from . import governance
+from . import governance, study
 from .chain import verify_chain
 from .crypto import FieldCipher
 from .replay import replay
@@ -68,6 +71,31 @@ class ParticipantIn(BaseModel):
     kind: Literal["real", "synthetic", "dev"]
     age_confirmed: bool
     consent: ConsentIn
+    study: bool = False          # dev testers may opt in to the study protocol; real participants always follow it
+
+
+class EnvIn(BaseModel):
+    """Browser facts for covariates and the sitting rules (D-046). Client-reported, so not a security control."""
+
+    browser_brand: Literal["chrome", "edge", "chromium", "firefox", "safari", "other"]
+    browser_version: str = Field(max_length=64)
+    cross_origin_isolated: bool
+
+
+class OnsetIn(BaseModel):
+    session_id: str
+    t_client_us: int = Field(ge=0)
+
+
+class ScriptedIn(BaseModel):
+    pseudonym: str
+    problem_id: str
+    condition: Literal["A2", "A3a", "A3b"]
+
+
+class AssignIn(BaseModel):
+    slot: int = Field(ge=0)
+    condition: Literal["genuine", "A8"]
 
 
 class DecisionIn(BaseModel):
@@ -86,6 +114,7 @@ class SessionIn(BaseModel):
     participant_token: str
     kind: Literal["practice", "exam"]
     problem_id: str
+    env: EnvIn | None = None
 
 
 def _bearer(authorization: str | None) -> str:
@@ -176,6 +205,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     governance.validate(settings.privacy)       # no real collection without every Q4 value
     problems = load_problems()
     rcfg = report_config()
+    study_cfg = load_config("study")
+    materials = study.load_materials()
     keystroke_model: dict[str, Any] = {}
 
     def get_model() -> tuple[Any, str]:
@@ -273,7 +304,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(400, "participants must confirm they are 18 or older")
         if body.kind == "real" and (not settings.privacy["real_collection_enabled"] or governance.missing(settings.privacy)):
             raise HTTPException(403, "real data collection is disabled until ethics approval")
-        pseudonym, token = await store().create_participant(body.kind, body.consent.model_dump())
+        in_study = body.kind == "real" or body.study            # every real participant follows the protocol (D-046)
+        pseudonym, token = await store().create_participant(
+            body.kind, body.consent.model_dump(), study_plan=(lambda row: study.plan(row, study_cfg)) if in_study else None)
         return {"pseudonym": pseudonym, "participant_token": token}
 
     @app.post("/api/sessions")
@@ -287,11 +320,121 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if body.kind != problem["kind"]:        # the server decides; the client's kind must agree
             raise HTTPException(400, f"{body.problem_id} is a {problem['kind']} task")
         once = [pid for pid, p in problems.items() if p.get("stage") == "check"] if problem.get("stage") == "check" else []
+        info = await store().participant_info(pseudonym)
+        env = body.env.model_dump() if body.env else None
+        label = None
+        if info and info["study_protocol"]:                     # sitting rules and the plan (D-046)
+            try:
+                study.check_session_env(session_kind=problem["kind"], participant_kind=info["kind"], env=env,
+                                        first_practice=await store().first_practice(pseudonym),
+                                        now=datetime.now(timezone.utc), cfg=study_cfg)
+            except study.StudyRuleError as exc:
+                raise HTTPException(409, str(exc)) from exc
+            if problem["kind"] == "exam":
+                slot = next((s for s in await store().study_plan(pseudonym) if s["problem_id"] == body.problem_id), None)
+                if slot is None:
+                    raise HTTPException(409, "this task is not in your study plan")
+                once, label = [body.problem_id], (slot["condition"], False)       # one session per slot
         try:          # one baseline check per participant (D-038), checked and inserted atomically
-            session_id, token = await store().create_session(pseudonym, problem["kind"], body.problem_id, at_most_once_among=once)
+            session_id, token = await store().create_session(pseudonym, problem["kind"], body.problem_id,
+                                                             at_most_once_among=once, env=env, label=label)
         except SessionLimitError as exc:
-            raise HTTPException(409, "the baseline check can only be taken once") from exc
+            raise HTTPException(409, "the baseline check can only be taken once" if problem.get("stage") == "check"
+                                else "this task has already been started") from exc
         return {"session_id": session_id, "session_token": token}
+
+    # ---- study protocol (D-046) ----------------------------------------------------------
+
+    @app.get("/api/me/plan")
+    async def my_plan(authorization: str | None = Header(None)) -> dict[str, Any]:
+        """The participant's sitting-2 plan, with their own role-play conditions (reviewers never see them)."""
+        pseudonym = await store().participant_by_token(_bearer(authorization))
+        if pseudonym is None:
+            raise HTTPException(403, "not authorised")
+        info = await store().participant_info(pseudonym)
+        if not info or not info["study_protocol"]:
+            return {"study": False, "slots": []}
+        slots = await store().study_plan(pseudonym)
+        for s in slots:
+            s["title"] = problems.get(s["problem_id"], {}).get("title", s["problem_id"])
+            s["material"] = s["condition"] in study.MATERIAL_CONDITIONS
+        first = await store().first_practice(pseudonym)
+        opens = (first[1] + timedelta(hours=float(study_cfg["min_sitting_gap_hours"]))).isoformat() \
+            if first and info["kind"] in study_cfg["gap_applies_to"] else None
+        return {"study": True, "slots": slots, "sitting2_opens_at": opens}
+
+    async def own_study_session(authorization: str | None, session_id: str) -> tuple[str, Any, dict[str, Any]]:
+        pseudonym = await store().participant_by_token(_bearer(authorization))
+        if pseudonym is None:
+            raise HTTPException(403, "not authorised")
+        session = await store().get_session(session_id)
+        label = await store().study_label(session.session_id) if session is not None and session.pseudonym == pseudonym else None
+        if session is None or label is None or label["scripted"]:
+            raise HTTPException(404, "no study condition for this session")
+        return pseudonym, session, label
+
+    @app.get("/api/me/material/{session_id}")
+    async def my_material(session_id: str, authorization: str | None = Header(None)) -> dict[str, Any]:
+        """The frozen LLM solution, only inside an A1, A4 or A5 session of this participant."""
+        _, session, label = await own_study_session(authorization, session_id)
+        m = materials.get(session.problem_id)
+        if label["condition"] not in study.MATERIAL_CONDITIONS or m is None:
+            raise HTTPException(404, "no study material for this session")
+        return {"problem_id": session.problem_id, "condition": label["condition"], "text": m["text"],
+                "label": m["label"], "model": m["model"], "generated_at": m["generated_at"]}
+
+    @app.post("/api/me/onset")
+    async def my_onset(body: OnsetIn, authorization: str | None = Header(None)) -> dict[str, Any]:
+        """The participant marks when the role-play starts (the attack onset, SPEC 12.2). Stored with the
+        label, apart from the events, so it never reaches the scoring path."""
+        _, session, label = await own_study_session(authorization, body.session_id)
+        if label["condition"] not in study.ONSET_CONDITIONS:
+            raise HTTPException(409, "this condition has no onset to mark")
+        if session.closed:
+            raise HTTPException(409, "the task is already submitted")
+        if not await store().set_onset(session.session_id, body.t_client_us):
+            raise HTTPException(409, "the start was already marked")
+        return {"marked": True}
+
+    @app.post("/api/admin/scripted-session")
+    async def scripted_session(body: ScriptedIn, authorization: str | None = Header(None)) -> dict[str, Any]:
+        """An A2/A3 session run by eval/tools/attack_runner on a study participant's exam task (SPEC 12.2)."""
+        actor, role = await staff(authorization, admin_only=True)
+        info = await store().participant_info(body.pseudonym)
+        if info is None or not info["study_protocol"]:
+            raise HTTPException(404, "unknown study participant")
+        if body.problem_id not in materials or problems.get(body.problem_id, {}).get("kind") != "exam":
+            raise HTTPException(404, "no study material for this task")
+        session_id, token = await store().create_session(body.pseudonym, "exam", body.problem_id, label=(body.condition, True))
+        await store().log_access_about(actor, role, f"scripted_session:{body.condition}", session_id=session_id)
+        return {"session_id": session_id, "session_token": token, "text": materials[body.problem_id]["text"]}
+
+    @app.get("/api/admin/participants/{pseudonym}/timing")
+    async def participant_timing(pseudonym: str, authorization: str | None = Header(None)) -> dict[str, Any]:
+        """The participant's own practice flights and holds, for the A3b runner (consented, SPEC 10.3)."""
+        actor, role = await staff(authorization, admin_only=True)
+        if not await store().log_access_about(actor, role, "read_timing", pseudonym=pseudonym):
+            raise HTTPException(404, "unknown participant")
+        sessions = await store().participant_sessions_with_events(pseudonym) or []
+        flights, holds = [], []
+        max_flight = float(study_cfg["a3b"]["flight_max_s"])
+        for s in sessions:
+            if s["kind"] != "practice" or not s["closed"]:
+                continue
+            ks = editor_keystrokes(s["events"])
+            holds += [(k.up_us - k.down_us) / 1e6 for k in ks]
+            flights += [d for d in ((b.down_us - a.down_us) / 1e6 for a, b in zip(ks, ks[1:])) if 0 < d < max_flight]
+        return {"flights_s": flights, "holds_s": holds}
+
+    @app.post("/api/admin/participants/{pseudonym}/assign")
+    async def assign_condition(pseudonym: str, body: AssignIn, authorization: str | None = Header(None)) -> dict[str, Any]:
+        """Researcher: make a not-yet-started genuine slot an A8 task (another keyboard), or back."""
+        actor, role = await staff(authorization, admin_only=True)
+        if not await store().log_access_about(actor, role, f"assign_condition:{body.condition}", pseudonym=pseudonym):
+            raise HTTPException(404, "unknown participant")
+        if not await store().assign_condition(pseudonym, body.slot, body.condition):
+            raise HTTPException(409, "no such slot, or it has already been started")
+        return {"slot": body.slot, "condition": body.condition}
 
     # ---- session-token endpoints -------------------------------------------------------------
 
@@ -314,7 +457,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         """Last batch sent with navigator.sendBeacon on pagehide (no custom headers possible)."""
         session_id = (await session_for(session_id, token)).session_id     # canonical spelling
         try:
-            msg = parse_message(await request.body())
+            body = await request.body()
+        except ClientDisconnect:            # the page went away mid-upload; the batch is resent on resume
+            return {"next_client_seq": None, "stored": 0}
+        try:
+            msg = parse_message(body)
             batch = msg.get("batch")
             if not isinstance(batch, dict) or batch.get("session_id") != session_id:
                 raise WireError("bad_message", "beacon must carry a batch for this session")

@@ -56,12 +56,19 @@ export const api = {
   problem: (id: string) => call<Problem>(`/api/problems/${id}`),
   createParticipant: (body: unknown) =>
     call<{ pseudonym: string; participant_token: string }>("/api/participants", { method: "POST", body: JSON.stringify(body) }),
-  createSession: (body: unknown) =>
+  createSession: (body: { participant_token: string; kind: string; problem_id: string; env?: SessionEnv }) =>
     call<{ session_id: string; session_token: string }>("/api/sessions", { method: "POST", body: JSON.stringify(body) }),
   sessionState: (id: string, token: string) => call<{ text: string; n_events: number }>(`/api/sessions/${id}/state`, {}, token),
   closeSession: (id: string, token: string) =>
     call<{ n_events: number; head_hash: string; signed: boolean }>(`/api/sessions/${id}/close`, { method: "POST" }, token),
   myReport: (participantToken: string) => call<Report>("/api/me/report", {}, participantToken),
+  plan: (participantToken: string) => call<StudyPlan>("/api/me/plan", {}, participantToken),
+  material: (sessionId: string, participantToken: string) =>
+    call<{ problem_id: string; condition: StudyCondition; text: string; label: string; model: string; generated_at: string }>(
+      `/api/me/material/${sessionId}`, {}, participantToken),
+  onset: (sessionId: string, tClientUs: number, participantToken: string) =>
+    call<{ marked: boolean }>("/api/me/onset", { method: "POST", body: JSON.stringify({ session_id: sessionId, t_client_us: tClientUs }) },
+      participantToken),
   withdraw: (participantToken: string) =>
     call<{ erased: boolean; n_sessions: number; n_events: number }>("/api/me/withdraw", { method: "POST" }, participantToken),
   appeal: (sessionId: string, note: string, participantToken: string) =>
@@ -83,6 +90,23 @@ export const api = {
       ),
   },
 };
+
+// ---- study protocol (D-046)
+
+export type StudyCondition = "genuine" | "A1" | "A2" | "A3a" | "A3b" | "A4" | "A5" | "A7" | "A8";
+
+export interface SessionEnv {
+  browser_brand: "chrome" | "edge" | "chromium" | "firefox" | "safari" | "other";
+  browser_version: string;
+  cross_origin_isolated: boolean;
+}
+
+export interface StudyPlan {
+  study: boolean;
+  slots: Array<{ slot: number; problem_id: string; title: string; condition: StudyCondition; material: boolean;
+    session_id: string | null; done: boolean }>;
+  sitting2_opens_at?: string | null;
+}
 
 /** Governance text for the consent notice (Q4), from config/privacy.yaml; "[to be set]" while blank. */
 export interface NoticeFields {

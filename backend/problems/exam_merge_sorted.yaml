@@ -1,0 +1,15 @@
+id: exam_merge_sorted
+kind: exam
+stage: exam
+title: Merge two sorted lists
+statement: |
+  Write a function `merge(a, b)` that merges two lists that are each sorted in ascending order into
+  one sorted list, without using `sorted` or `sort`. For example `merge([1, 4], [2, 3, 5])` is
+  `[1, 2, 3, 4, 5]`.
+starter: |
+  def merge(a, b):
+      pass
+tests:
+  - {call: "merge([1, 4], [2, 3, 5])", expected: "[1, 2, 3, 4, 5]"}
+  - {call: "merge([], [1])", expected: "[1]"}
+  - {call: "merge([2, 2], [2])", expected: "[2, 2, 2]"}

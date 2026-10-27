@@ -1,0 +1,14 @@
+id: exam_second_largest
+kind: exam
+stage: exam
+title: Second largest
+statement: |
+  Write a function `second_largest(xs)` that returns the second largest distinct value in the list
+  `xs`, or `None` if there is no such value. For example `second_largest([3, 1, 3, 2])` is `2`.
+starter: |
+  def second_largest(xs):
+      pass
+tests:
+  - {call: "second_largest([3, 1, 3, 2])", expected: "2"}
+  - {call: "second_largest([5, 5])", expected: "None"}
+  - {call: "second_largest([-1, -7, 0])", expected: "-1"}

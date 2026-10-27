@@ -1,0 +1,31 @@
+# Frozen study material (SPEC 12.2, D-046): an LLM solution for A1/A4/A5 and the text the scripted
+# attacks (A2/A3) type. Generated once, before any collection; never edit (the loader checks sha256).
+problem_id: exam_balanced
+llm_solution:
+  label: llm_generated
+  model: claude-opus-5-5
+  model_name: Claude Opus 5.5
+  generated_at: '2026-10-28'
+  generated_in: Claude Code session that built this repository
+  prompt: |
+    Solve this Python exercise. Reply with only the code, no explanation.
+
+    Write a function `balanced(s)` that returns `True` if every bracket in `s` ( `()`, `[]`, `{}` ) is
+    closed by the matching bracket in the right order, and `False` otherwise. Other characters are
+    ignored. For example `balanced("a(b[c])")` is `True` and `balanced("(]")` is `False`.
+
+    def balanced(s):
+        pass
+  text: |
+    def balanced(s):
+        pairs = {")": "(", "]": "[", "}": "{"}
+        stack = []
+        for ch in s:
+            if ch in "([{":
+                stack.append(ch)
+            elif ch in pairs:
+                if not stack or stack[-1] != pairs[ch]:
+                    return False
+                stack.pop()
+        return not stack
+  sha256: 4250dc0d35ae11f5220c00165c2e18bd18d804e98c34c631f5a255f0dca6348b

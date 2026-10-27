@@ -16,8 +16,11 @@ ADMIN = {"Authorization": "Bearer admin-test-token"}
 CONSENT = {"notice_version": "draft-p1", "notice_sha256": "a" * 64, "choices": {"participation": True}}
 
 
-def submit(client: Any, participant_token: str, kind: str, problem: str, events_of: Any) -> str:
-    r = client.post("/api/sessions", json={"participant_token": participant_token, "kind": kind, "problem_id": problem})
+def submit(client: Any, participant_token: str, kind: str, problem: str, events_of: Any, env: dict[str, Any] | None = None) -> str:
+    body: dict[str, Any] = {"participant_token": participant_token, "kind": kind, "problem_id": problem}
+    if env is not None:
+        body["env"] = env
+    r = client.post("/api/sessions", json=body)
     assert r.status_code == 200, r.text
     sid, token = r.json()["session_id"], r.json()["session_token"]
     gen = SyntheticTyping()

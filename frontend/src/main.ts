@@ -7,6 +7,7 @@ import { myReportPage } from "./pages/myReport";
 import { replayPage } from "./pages/replay";
 import { sessionPage } from "./pages/session";
 import { setupPage } from "./pages/setup";
+import { materialPage } from "./pages/study";
 
 const root = document.getElementById("app")!;
 let current = "";
@@ -27,6 +28,7 @@ async function route(): Promise<void> {
   if (parts[0] === "replay") return replayPage(root, new URLSearchParams(query));
   if (parts[0] === "dashboard") return dashboardPage(root, new URLSearchParams(query));
   if (parts[0] === "my-report") return myReportPage(root);
+  if (parts[0] === "material" && parts[1]) return materialPage(root, parts[1]);
   if (parts[0] === "keycheck") return keycheckPage(root, new URLSearchParams(query));
   return consentPage(root);
 }

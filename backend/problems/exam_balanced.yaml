@@ -1,0 +1,15 @@
+id: exam_balanced
+kind: exam
+stage: exam
+title: Balanced brackets
+statement: |
+  Write a function `balanced(s)` that returns `True` if every bracket in `s` ( `()`, `[]`, `{}` ) is
+  closed by the matching bracket in the right order, and `False` otherwise. Other characters are
+  ignored. For example `balanced("a(b[c])")` is `True` and `balanced("(]")` is `False`.
+starter: |
+  def balanced(s):
+      pass
+tests:
+  - {call: "balanced('a(b[c])')", expected: "True"}
+  - {call: "balanced('(]')", expected: "False"}
+  - {call: "balanced('((')", expected: "False"}

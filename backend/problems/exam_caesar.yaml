@@ -1,0 +1,15 @@
+id: exam_caesar
+kind: exam
+stage: exam
+title: Caesar shift
+statement: |
+  Write a function `caesar(s, k)` that shifts every letter in `s` forward by `k` places in the
+  alphabet, wrapping from z to a, keeping upper and lower case. Other characters stay as they are.
+  For example `caesar("Abz!", 1)` is `"Bca!"`.
+starter: |
+  def caesar(s, k):
+      pass
+tests:
+  - {call: "caesar('Abz!', 1)", expected: "'Bca!'"}
+  - {call: "caesar('hello', 26)", expected: "'hello'"}
+  - {call: "caesar('Xy', 3)", expected: "'Ab'"}

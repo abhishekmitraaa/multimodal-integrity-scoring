@@ -4,6 +4,7 @@ import { api } from "../api";
 import { detectLayout } from "../capture/device";
 import { h } from "../dom";
 import { store, type SetupState } from "../state";
+import { ROLEPLAY, sessionEnv } from "./study";
 import { withdrawPanel } from "./withdraw";
 
 const PROBLEMS: Array<{ id: string; kind: "practice" | "exam"; stage: "baseline" | "check" | "exam"; label: string }> = [
@@ -35,11 +36,21 @@ export async function setupPage(root: HTMLElement): Promise<void> {
   );
   const error = h("p", { class: "error" });
   const done = new Set(store.done());
-  const buttons = PROBLEMS.map((p) =>
-    h("button", {
+  // Study participants (D-046) get their own sitting-2 plan: six tasks, each with a role-play condition.
+  const plan = await api.plan(participant.token).catch(() => null);
+  const slots = plan?.study ? plan.slots : [];
+  const tasks = slots.length
+    ? [...PROBLEMS.filter((p) => p.stage !== "exam"),
+      ...slots.map((s) => ({ id: s.problem_id, kind: "exam" as const, stage: "exam" as const, label: `Exam ${s.slot + 1}: ${s.title}` }))]
+    : PROBLEMS;
+  const slotOf = new Map(slots.map((s) => [s.problem_id, s]));
+  const buttons = tasks.map((p) => {
+    const s = slotOf.get(p.id);
+    const finished = s ? s.done : done.has(p.id);
+    const b = h("button", {
       "data-problem": p.id,
-      class: done.has(p.id) ? "task-done" : undefined,
-      disabled: p.stage === "check" && done.has(p.id),     // the server allows one baseline check (D-038)
+      class: finished ? "task-done" : undefined,
+      disabled: (p.stage === "check" && done.has(p.id)) || Boolean(s?.session_id),   // one check (D-038); one session per study task
       onclick: async () => {
         const setup: SetupState = {
           keyboardType: (keyboard as HTMLSelectElement).value as SetupState["keyboardType"],
@@ -47,21 +58,25 @@ export async function setupPage(root: HTMLElement): Promise<void> {
         };
         store.setSetup(setup);
         try {
-          const s = await api.createSession({ participant_token: participant.token, kind: p.kind, problem_id: p.id });
-          store.addSession(s.session_id, { token: s.session_token, problemId: p.id, kind: p.kind });
-          location.hash = `#/session/${s.session_id}`;
+          const created = await api.createSession({ participant_token: participant.token, kind: p.kind, problem_id: p.id, env: await sessionEnv() });
+          store.addSession(created.session_id, { token: created.session_token, problemId: p.id, kind: p.kind });
+          location.hash = `#/session/${created.session_id}`;
         } catch (err) {
           error.textContent = String(err);
         }
       },
-    }, done.has(p.id) ? `✓ ${p.label}` : p.label),
-  );
-  const byStage = (stage: string) => buttons.filter((_, i) => PROBLEMS[i].stage === stage);
+    }, finished ? `✓ ${p.label}` : p.label);
+    return s ? h("div", { class: "slot", "data-slot": String(s.slot), "data-condition": s.condition },
+      b, h("span", { class: "muted" }, ` ${ROLEPLAY[s.condition].title}`)) : b;
+  });
+  const byStage = (stage: string) => buttons.filter((_, i) => tasks[i].stage === stage);
   const practiceButtons = byStage("baseline");
   const checkButtons = byStage("check");
   const examButtons = byStage("exam");
-  const practiceDone = PROBLEMS.filter((p) => p.stage === "baseline" && done.has(p.id)).length;
-  const checkDone = PROBLEMS.some((p) => p.stage === "check" && done.has(p.id));
+  const practiceDone = tasks.filter((p) => p.stage === "baseline" && done.has(p.id)).length;
+  const checkDone = tasks.some((p) => p.stage === "check" && done.has(p.id));
+  const examDone = slots.length ? slots.some((s) => s.done) : done.has("exam_run_length");
+  const opens = plan?.sitting2_opens_at ? new Date(plan.sitting2_opens_at) : null;
   root.replaceChildren(
     h("main", { class: "narrow" },
       h("h1", {}, "Before you start"),
@@ -77,11 +92,14 @@ export async function setupPage(root: HTMLElement): Promise<void> {
         "baseline really describes you, and it sets your own normal range for the exam.",
         practiceDone < practiceButtons.length ? " Finish the practice tasks first." : ""),
       h("div", { class: "row" }, ...checkButtons),
-      h("h2", {}, "Step 3: exam"),
-      h("p", { class: "muted" }, "Solve it yourself. Afterwards it is checked against your baseline and you can see the report.",
-        !checkDone ? " Do the baseline check first." : ""),
-      h("div", { class: "row" }, ...examButtons),
-      done.has("exam_run_length") ? h("p", {}, h("a", { href: "#/my-report", id: "setup-report" }, "See your report")) : null,
+      h("h2", {}, slots.length ? "Step 3: exam tasks (sitting 2)" : "Step 3: exam"),
+      h("p", { class: "muted" }, slots.length
+        ? "Each task has its own instructions on its page. Some are role-play for the study, with no consequences."
+        : "Solve it yourself. Afterwards it is checked against your baseline and you can see the report.",
+      !checkDone ? " Do the baseline check first." : ""),
+      opens && opens > new Date() ? h("p", { class: "banner", id: "sitting2-opens" }, `Sitting 2 opens on ${opens.toLocaleString()}.`) : null,
+      h("div", { class: slots.length ? "slots" : "row", id: "exam-tasks" }, ...examButtons),
+      examDone ? h("p", {}, h("a", { href: "#/my-report", id: "setup-report" }, "See your report")) : null,
       error,
       withdrawPanel(participant),
     ),

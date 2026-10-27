@@ -382,3 +382,9 @@ button.task-done {
 .withdraw { margin-top: 32px; }
 .withdraw summary { cursor: pointer; color: var(--muted); }
 button.danger { border-color: var(--error); color: var(--error); }
+
+/* Study protocol (D-046). */
+.slots { display: grid; gap: 8px; }
+.slot { display: flex; align-items: center; gap: 8px; }
+.roleplay { margin-bottom: 12px; padding: 10px 12px; border-left: 4px solid var(--accent); background: var(--panel); }
+.roleplay-genuine { border-left-color: var(--ok); }

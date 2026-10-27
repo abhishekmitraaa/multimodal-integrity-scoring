@@ -43,8 +43,18 @@ def test_there_are_practice_and_exam_problems() -> None:
 def test_stages_baseline_check_exam() -> None:
     """D-038: practice tasks build the baseline, one check task tests it, the exam is checked against it."""
     stages = sorted(p["stage"] for p in PROBLEMS.values())
-    assert stages.count("baseline") == 3 and stages.count("check") == 1 and stages.count("exam") == 1
+    assert stages.count("baseline") == 3 and stages.count("check") == 1 and stages.count("exam") == 6
     assert all(p["kind"] == "practice" for p in PROBLEMS.values() if p["stage"] in ("baseline", "check"))
+
+
+def test_every_exam_task_is_in_the_study_plan_and_has_frozen_material() -> None:
+    """D-046: sitting 2 is the six exam tasks; each has a frozen, provenance-checked LLM solution."""
+    from integrity_backend.settings import load_config
+    from integrity_backend.study import load_materials
+
+    exams = {pid for pid, p in PROBLEMS.items() if p["kind"] == "exam"}
+    assert set(load_config("study")["sitting2_tasks"]) == exams
+    assert set(load_materials()) == exams
 
 
 def test_loader_refuses_a_stage_that_does_not_fit_the_kind(tmp_path: Any, monkeypatch: Any) -> None:

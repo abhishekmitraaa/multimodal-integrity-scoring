@@ -1,0 +1,25 @@
+# Frozen study material (SPEC 12.2, D-046): an LLM solution for A1/A4/A5 and the text the scripted
+# attacks (A2/A3) type. Generated once, before any collection; never edit (the loader checks sha256).
+problem_id: exam_top_word
+llm_solution:
+  label: llm_generated
+  model: claude-opus-5-5
+  model_name: Claude Opus 5.5
+  generated_at: '2026-10-28'
+  generated_in: Claude Code session that built this repository
+  prompt: |
+    Solve this Python exercise. Reply with only the code, no explanation.
+
+    Write a function `top_word(text)` that returns the most frequent word in `text`, in lower case.
+    Words are separated by spaces. If several words are equally frequent, return the one that comes
+    first alphabetically. For example `top_word("b a B a c")` is `"a"`.
+
+    def top_word(text):
+        pass
+  text: |
+    def top_word(text):
+        counts = {}
+        for word in text.lower().split():
+            counts[word] = counts.get(word, 0) + 1
+        return min(counts, key=lambda w: (-counts[w], w))
+  sha256: 8dcf0503f4799a2700cd73c4631da0e4f001f2adfc6e4f3f5d607596d8056027
