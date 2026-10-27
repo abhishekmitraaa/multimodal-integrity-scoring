@@ -172,6 +172,8 @@ def test_baseline_pooled_sd_and_distance() -> None:
     assert b[0] == 1.0 and b[1] == 2.0                                 # unavailable values ignored
     x = np.full(n, 4.0)
     assert process_distance(x, np.full(n, 2.0), np.full(n, 2.0)) == pytest.approx(1.0)
+    half = np.where(np.arange(n) % 2 == 0, 4.0, 2.0)                   # z = 1 on half the features, 0 on the rest
+    assert process_distance(half, np.full(n, 2.0), np.full(n, 2.0)) == pytest.approx(np.sqrt(0.5))   # RMS (SPEC 7.4), not mean |z|
     assert process_distance(np.full(n, np.nan), b, s) is None
     v = vector(process_features(Log().keys(100).events, CFG))
     assert v.shape == (n,) and np.isnan(v[FEATURES.index("pre_burst_pause")])

@@ -37,3 +37,24 @@ synthetic_keystrokes:            # D3 generator for pipeline tests only; never r
   noise_hold_log_sd: 0.15
   separations: [0.0, 0.5, 1.0]      # 0 = everyone types identically (EER should be near 50%)
   encoder_epochs: 20                # pipeline check only; the D1 run uses models.yaml max_epochs
+fusion_dryrun:                   # SYNTHETIC D4 sessions (integrity_eval.synthetic_sessions): a test of the fusion pipeline, never a result
+  dataset_id: d4_synthetic_sessions_v1
+  users: 40
+  outer_folds: 5
+  inner_folds: 4
+  base_flight_ms: 190            # population median press-to-press
+  base_hold_ms: 95
+  user_speed_log_sd: 0.25
+  user_hold_log_sd: 0.20
+  user_pair_log_sd: 0.25         # per-user habit per key pair
+  noise_flight_log_sd: 0.30      # within-user, per keystroke
+  noise_hold_log_sd: 0.15
+  pause_p_range: [0.05, 0.20]    # chance of a 2-5 s pause before a line (copy-typing)
+  typo_p_range: [0.01, 0.04]
+  composing_pause_scale: 2.5     # genuine exam: more pauses than practice...
+  composing_typo_scale: 1.5      # ...more corrections...
+  composing_pause_s: [3.0, 10.0] # ...and longer pauses
+  a1_typed_share: 0.3            # A1 types this share, then leaves and pastes the rest
+  a1_away_s: [20, 60]
+  auto_typer_flight_ms: 110      # A3b: near-constant rhythm (+-1%)
+  auto_typer_hold_ms: 55

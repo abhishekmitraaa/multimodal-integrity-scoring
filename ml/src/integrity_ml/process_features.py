@@ -273,8 +273,9 @@ def pooled_within_sd(by_user: Mapping[str, Sequence[NDArray[np.float64]]]) -> ND
 
 
 def process_distance(x: NDArray[np.float64], b: NDArray[np.float64], s: NDArray[np.float64]) -> float | None:
-    """d_proc = mean_k |x_k - b_k| / s_k over features available in both and with s_k > 0; None if none."""
+    """d_proc = sqrt(mean_k ((x_k - b_k) / s_k)^2) (SPEC 7.4) over features available in both and with
+    s_k > 0; None if none."""
     with np.errstate(invalid="ignore", divide="ignore"):
-        z = np.abs(x - b) / s
+        z = (x - b) / s
     ok = np.isfinite(z) & (s > 0)
-    return float(z[ok].mean()) if ok.any() else None
+    return float(np.sqrt(np.mean(z[ok] ** 2))) if ok.any() else None

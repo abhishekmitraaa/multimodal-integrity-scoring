@@ -679,6 +679,9 @@ are shared, the baseline is unavailable.
   - raising any distance input never raises $S$;
   - the fit matches scikit-learn when the bounds are inactive.
 - **Guard.** `assert_weight_signs` runs on every trained artifact.
+- **Dry run (D-045).** `python -m integrity_eval.fusion_dryrun --out <...synthetic...md> [--encoder <P2 file>]`
+  runs the whole pipeline (ticks, features, nested CV, fusion, smoothing, tau, report) on SYNTHETIC
+  sessions. It tests the code; its numbers are never results.
 - **Weights pinned at 0.** A distance weight stuck at the bound means the data disagreed with the
   orientation. Training logs it, and the report names it.
 

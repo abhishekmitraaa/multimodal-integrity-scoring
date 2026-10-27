@@ -117,6 +117,18 @@ The first part of P4, built after "continue".
 - The shared development token still works for testing, but the backend refuses to start with
   real collection on while it is enabled.
 
+## Addition: fusion pipeline dry run (D-045, 2026-10-27; SYNTHETIC)
+
+- `integrity_eval.synthetic_sessions` generates synthetic users and sessions in the exact stored
+  event shape; `integrity_eval.fusion_dryrun` runs the full SPEC 7.4 / 8 / 12.3 pipeline on them.
+- Runs on 40 synthetic users (5 outer folds) with the P2 encoder and with a stand-in embedding.
+  They show the code works end to end and keeps the sign rule. **They are not results**: the
+  generator's attacks are easy by construction and it does not model coding style (the AST inputs
+  are pinned at 0 every fold, as expected). Reports are under the data root, file names marked
+  synthetic.
+- When study data exists, the same pipeline runs on it with the real sessions in place of the
+  generator.
+
 ## How it's built
 
 | Part | Where |

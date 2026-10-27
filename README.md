@@ -97,6 +97,9 @@ everything, press Ctrl+C and close the backend window.
 | Reviewer replay (token in `~/.integrity-exam/secrets/reviewer_token.txt`) | http://127.0.0.1:5173/#/replay | yes |
 | A participant's own report and notes for the reviewer (after submitting the exam) | http://127.0.0.1:5173/#/my-report | yes |
 
+Fusion pipeline dry run on SYNTHETIC sessions (tests the code, never a result):
+`cd eval; python -m integrity_eval.fusion_dryrun --out D:\integrity-data\derived\fusion_dryrun\fusion_dryrun_synthetic.md`.
+
 Reviewer accounts: `python scripts/staff_accounts.py add <handle> --role reviewer` (prints the
 token once), `list`, `disable <handle>`.
 
