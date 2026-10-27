@@ -289,21 +289,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/api/sessions/{session_id}/state")
     async def session_state(session_id: str, authorization: str | None = Header(None)) -> dict[str, Any]:
         """Current document for restoring the editor after a reload."""
-        await session_for(session_id, _bearer(authorization))
+        session_id = (await session_for(session_id, _bearer(authorization))).session_id     # canonical spelling
         _, links = await store().load_links(session_id)
         r = replay([(lk.record.server_seq, lk.record.type, lk.record.data) for lk in links])
         return {"text": r.doc.text, "n_events": len(links)}
 
     @app.post("/api/sessions/{session_id}/close")
     async def close_session(session_id: str, authorization: str | None = Header(None)) -> dict[str, Any]:
-        await session_for(session_id, _bearer(authorization))
+        session_id = (await session_for(session_id, _bearer(authorization))).session_id     # canonical spelling
         n_events, head = await store().close_session(session_id)
         return {"n_events": n_events, "head_hash": head, "signed": False}
 
     @app.post("/api/sessions/{session_id}/beacon")
     async def beacon(session_id: str, request: Request, token: str = "") -> dict[str, Any]:
         """Last batch sent with navigator.sendBeacon on pagehide (no custom headers possible)."""
-        await session_for(session_id, token)
+        session_id = (await session_for(session_id, token)).session_id     # canonical spelling
         try:
             msg = parse_message(await request.body())
             batch = msg.get("batch")
@@ -338,14 +338,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/api/participants/{pseudonym}/report")
     async def staff_report(pseudonym: str, authorization: str | None = Header(None)) -> dict[str, Any]:
         actor, role = staff(authorization)
-        try:
-            report = await participant_report(pseudonym)
-        except HTTPException:
-            # Logged without the requested name, so an erased pseudonym never comes back into the log.
-            await store().log_access(actor, role, "read_report", "[unknown participant]")
-            raise
-        await store().log_access(actor, role, "read_report", pseudonym)
-        return report
+        # Logged first and atomically with erasure: an erased pseudonym never comes back into the log.
+        if not await store().log_access_about(actor, role, "read_report", pseudonym=pseudonym):
+            raise HTTPException(404, "unknown participant")
+        return await participant_report(pseudonym)
 
     @app.post("/api/sessions/{session_id}/decision")
     async def record_decision(session_id: str, body: DecisionIn, authorization: str | None = Header(None)) -> dict[str, Any]:
@@ -357,10 +353,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(404, "unknown session")
         if session.kind != "exam" or not session.closed:
             raise HTTPException(409, "decisions are recorded on submitted exams only")
+        sid = session.session_id                    # canonical spelling
+        if not await store().log_access_about(actor, role, f"record_decision:{body.decision}", session_id=sid):
+            raise HTTPException(404, "unknown session")
         report = await participant_report(session.pseudonym)
-        state = next((e["state"] for e in report["exams"] if e["session_id"] == session_id), "unknown")
-        saved = await store().add_decision(session_id, actor, body.decision, state, body.notes)
-        await store().log_access(actor, role, f"record_decision:{body.decision}", session_id)
+        state = next((e["state"] for e in report["exams"] if e["session_id"] == sid), "unknown")
+        saved = await store().add_decision(sid, actor, body.decision, state, body.notes)
         return {**saved, "decision": body.decision, "report_state": state}
 
     @app.post("/api/me/appeals")
@@ -374,9 +372,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(404, "unknown session")
         if session.kind != "exam" or not session.closed:
             raise HTTPException(409, "appeals are for submitted exams only")
-        saved = await store().add_appeal(body.session_id, pseudonym, body.note)
-        await store().log_access(pseudonym, "participant", "add_appeal", body.session_id)
-        return saved
+        if not await store().log_access_about(pseudonym, "participant", "add_appeal", session_id=session.session_id):
+            raise HTTPException(404, "unknown session")
+        return await store().add_appeal(session.session_id, pseudonym, body.note)
 
     @app.post("/api/me/withdraw")
     async def withdraw(authorization: str | None = Header(None)) -> dict[str, Any]:
@@ -400,24 +398,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         pseudonym = await store().participant_by_token(_bearer(authorization))
         if pseudonym is None:
             raise HTTPException(403, "not authorised")
-        await store().log_access(pseudonym, "participant", "read_own_report", pseudonym)
+        if not await store().log_access_about(pseudonym, "participant", "read_own_report", pseudonym=pseudonym):
+            raise HTTPException(403, "not authorised")
         return await participant_report(pseudonym, for_participant=True)
 
     @app.get("/api/sessions/{session_id}/events")
     async def session_events(session_id: str, authorization: str | None = Header(None)) -> dict[str, Any]:
         actor, role = staff(authorization)
-        if await store().get_session(session_id) is None:
+        session_id = Store.canonical(session_id)
+        if not await store().log_access_about(actor, role, "read_events", session_id=session_id):
             raise HTTPException(404, "unknown session")
-        await store().log_access(actor, role, "read_events", session_id)
         _, links = await store().load_links(session_id)
         return {"session_id": session_id, "events": _events_payload(links)}
 
     @app.get("/api/sessions/{session_id}/replay")
     async def session_replay(session_id: str, upto: int | None = None, authorization: str | None = Header(None)) -> dict[str, Any]:
         actor, role = staff(authorization)
-        if await store().get_session(session_id) is None:
+        session_id = Store.canonical(session_id)
+        if not await store().log_access_about(actor, role, "replay", session_id=session_id):
             raise HTTPException(404, "unknown session")
-        await store().log_access(actor, role, "replay", session_id)
         _, links = await store().load_links(session_id)
         r = replay([(lk.record.server_seq, lk.record.type, lk.record.data) for lk in links], upto)
         return {
@@ -432,9 +431,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/api/sessions/{session_id}/verify")
     async def session_verify(session_id: str, authorization: str | None = Header(None)) -> dict[str, Any]:
         actor, role = staff(authorization)
-        if await store().get_session(session_id) is None:
+        session_id = Store.canonical(session_id)
+        if not await store().log_access_about(actor, role, "verify_chain", session_id=session_id):
             raise HTTPException(404, "unknown session")
-        await store().log_access(actor, role, "verify_chain", session_id)
         genesis_hash, links = await store().load_links(session_id)
         result = verify_chain(genesis_hash, links)
         return {
@@ -466,6 +465,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if session is None:
             await ws.close(code=4403)
             return
+        session_id = session.session_id     # canonical spelling
         await ws.accept()
         previous = app.state.active.get(session_id)
         if previous is not None:  # one live connection per session; the newest wins

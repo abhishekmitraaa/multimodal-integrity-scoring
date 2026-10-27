@@ -160,3 +160,24 @@ def test_retention_job_against_the_database(make_client: Any) -> None:
     assert names <= set(c.portal.call(store.all_pseudonyms))
     result = c.portal.call(governance.run_retention, store, privacy(), dt.date(2027, 7, 29), True)
     assert result["erased"] >= 2 and c.portal.call(store.all_pseudonyms) == []
+
+
+def test_session_ids_are_logged_canonically_and_redacted_in_any_spelling(client: Any) -> None:
+    p = client.post("/api/participants", json={"kind": "synthetic", "age_confirmed": True, "consent": CONSENT}).json()
+    exam = submit(client, p["participant_token"], "exam", "exam_run_length", pasted_exam)
+    odd = "{" + exam.upper().replace("-", "") + "}"           # PostgreSQL accepts this spelling too
+    assert client.get(f"/api/sessions/{odd}/verify", headers=REVIEWER).status_code == 200
+    log = client.get("/api/access-log", headers=ADMIN).json()
+    assert ("verify_chain", exam) in {(e["action"], e["target"]) for e in log}       # canonical form
+    client.post("/api/me/withdraw", headers={"Authorization": f"Bearer {p['participant_token']}"})
+    log = client.get("/api/access-log", headers=ADMIN).json()
+    assert not any(exam.replace("-", "") in e["target"].replace("-", "").lower() for e in log)
+
+
+def test_reads_of_unknown_participants_and_sessions_name_nobody(client: Any) -> None:
+    assert client.get("/api/participants/SYN-NOSUCH00/report", headers=REVIEWER).status_code == 404
+    assert client.get("/api/sessions/00000000-0000-0000-0000-000000000000/replay", headers=REVIEWER).status_code == 404
+    assert client.get("/api/sessions/not-a-uuid/events", headers=REVIEWER).status_code == 404
+    targets = {e["target"] for e in client.get("/api/access-log", headers=ADMIN).json()}
+    assert {"[unknown participant]", "[unknown session]"} <= targets
+    assert not targets & {"SYN-NOSUCH00", "not-a-uuid", "00000000-0000-0000-0000-000000000000"}

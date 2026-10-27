@@ -27,6 +27,14 @@ def now_us() -> int:
     return time.time_ns() // 1000
 
 
+def _is_uuid(value: str) -> bool:
+    try:
+        uuid.UUID(value)
+    except ValueError:
+        return False
+    return True
+
+
 def sha256(value: str) -> bytes:
     return hashlib.sha256(value.encode("utf-8")).digest()
 
@@ -139,7 +147,7 @@ class Store:
 
     async def _session_row(self, session_id: str) -> Any:
         try:
-            uuid.UUID(session_id)
+            session_id = str(uuid.UUID(session_id))      # one spelling; asyncpg rejects braces
         except ValueError:
             return None
         async with self.engine.connect() as conn:
@@ -401,12 +409,52 @@ class Store:
 
     # ---- audit and erasure ---------------------------------------------------------------
 
+    @staticmethod
+    def canonical(target: str) -> str:
+        """UUID-shaped targets in one spelling (PostgreSQL also accepts upper case, braces and no
+        hyphens), so erasure's exact-match redaction finds them."""
+        try:
+            return str(uuid.UUID(target))
+        except ValueError:
+            return target
+
     async def log_access(self, actor: str, role: str, action: str, target: str) -> None:
+        """For targets that name no participant. Use log_access_about when one does."""
         async with self.engine.begin() as conn:
             await conn.execute(
                 text("INSERT INTO access_log (actor, role, action, target) VALUES (:a, :r, :ac, :t)"),
-                {"a": actor, "r": role, "ac": action, "t": target},
+                {"a": actor, "r": role, "ac": action, "t": self.canonical(target)},
             )
+
+    async def log_access_about(self, actor: str, role: str, action: str, *,
+                               pseudonym: str | None = None, session_id: str | None = None) -> bool:
+        """Log an access to a participant or one of their sessions, atomically with erasure.
+
+        The participant row is locked FOR KEY SHARE while the log row is written, and erasure's
+        DELETE needs a conflicting lock. So either the log row commits first and the erasure then
+        redacts it, or the erasure commits first and nothing identifying is written (the target is
+        "[unknown ...]"). Returns whether the participant or session exists. A participant actor
+        (role "participant") is written only while they exist."""
+        async with self.engine.begin() as conn:
+            row = None
+            if session_id is not None:
+                target, unknown = self.canonical(session_id), "[unknown session]"
+                if _is_uuid(session_id):
+                    row = (await conn.execute(text(
+                        "SELECT p.pseudonym FROM sessions s JOIN participants p ON p.pseudonym = s.pseudonym "
+                        "WHERE s.session_id = CAST(:s AS uuid) FOR KEY SHARE OF p"), {"s": target})).first()
+            else:
+                assert pseudonym is not None
+                target, unknown = pseudonym, "[unknown participant]"
+                row = (await conn.execute(text("SELECT pseudonym FROM participants WHERE pseudonym = :p FOR KEY SHARE"),
+                                          {"p": pseudonym})).first()
+            exists = row is not None
+            await conn.execute(
+                text("INSERT INTO access_log (actor, role, action, target) VALUES (:a, :r, :ac, :t)"),
+                {"a": actor if exists or role != "participant" else "participant", "r": role, "ac": action,
+                 "t": target if exists else unknown},
+            )
+        return exists
 
     async def access_log(self, limit: int = 500) -> list[dict[str, Any]]:
         async with self.engine.connect() as conn:
