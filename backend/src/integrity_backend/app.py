@@ -69,6 +69,18 @@ class ParticipantIn(BaseModel):
     consent: ConsentIn
 
 
+class DecisionIn(BaseModel):
+    """A reviewer's decision on one exam (D-039). Notes are required (SPEC 10.10)."""
+
+    decision: Literal["confirm", "dismiss", "inconclusive"]
+    notes: str = Field(min_length=10, max_length=4000)
+
+
+class AppealIn(BaseModel):
+    session_id: str
+    note: str = Field(min_length=10, max_length=4000)
+
+
 class SessionIn(BaseModel):
     participant_token: str
     kind: Literal["practice", "exam"]
@@ -178,6 +190,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             sessions = [x for x in sessions if x["closed"]]
             note = "Keystroke reference ranges from a public dataset." if model is not None else "The typing check is not available on this server."
         report = await asyncio.to_thread(build_report, pseudonym, sessions, model, note, rcfg)
+        reviews = await store().reviews_for([e["session_id"] for e in report["exams"]])
+        for exam in report["exams"]:
+            r = reviews[exam["session_id"]]
+            if for_participant:     # the outcome and date, not who decided or their notes
+                exam["decisions"] = [{"decision": d["decision"], "at": d["at"]} for d in r["decisions"]]
+            else:
+                exam["decisions"] = r["decisions"]
+            exam["appeals"] = r["appeals"]
         return redact_for_participant(report) if for_participant else report
     policy = policy_payload(settings.editor_policy)
     prefixes = {
@@ -305,9 +325,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         actor, role = staff(authorization)
         await store().log_access(actor, role, "list_participants", "*")
         participants = await store().list_participants()
+        decisions = await store().latest_decisions()
         for p in participants:
             for x in p["sessions"]:
                 x["stage"] = problems.get(x["problem_id"], {}).get("stage", "exam" if x["kind"] == "exam" else "baseline")
+                x["decision"] = decisions.get(x["session_id"])
         return participants
 
     @app.get("/api/participants/{pseudonym}/report")
@@ -315,6 +337,37 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         actor, role = staff(authorization)
         await store().log_access(actor, role, "read_report", pseudonym)
         return await participant_report(pseudonym)
+
+    @app.post("/api/sessions/{session_id}/decision")
+    async def record_decision(session_id: str, body: DecisionIn, authorization: str | None = Header(None)) -> dict[str, Any]:
+        """A reviewer's decision on a submitted exam (D-039). Append-only: a new decision supersedes
+        the previous one, and both stay in the history."""
+        actor, role = staff(authorization)
+        session = await store().get_session(session_id)
+        if session is None:
+            raise HTTPException(404, "unknown session")
+        if session.kind != "exam" or not session.closed:
+            raise HTTPException(409, "decisions are recorded on submitted exams only")
+        report = await participant_report(session.pseudonym)
+        state = next((e["state"] for e in report["exams"] if e["session_id"] == session_id), "unknown")
+        saved = await store().add_decision(session_id, actor, body.decision, state, body.notes)
+        await store().log_access(actor, role, f"record_decision:{body.decision}", session_id)
+        return {**saved, "decision": body.decision, "report_state": state}
+
+    @app.post("/api/me/appeals")
+    async def add_appeal(body: AppealIn, authorization: str | None = Header(None)) -> dict[str, Any]:
+        """A participant's note on their own submitted exam (SPEC 10.10)."""
+        pseudonym = await store().participant_by_token(_bearer(authorization))
+        if pseudonym is None:
+            raise HTTPException(403, "not authorised")
+        session = await store().get_session(body.session_id)
+        if session is None or session.pseudonym != pseudonym:
+            raise HTTPException(404, "unknown session")
+        if session.kind != "exam" or not session.closed:
+            raise HTTPException(409, "appeals are for submitted exams only")
+        saved = await store().add_appeal(body.session_id, pseudonym, body.note)
+        await store().log_access(pseudonym, "participant", "add_appeal", body.session_id)
+        return saved
 
     @app.get("/api/me/report")
     async def own_report(authorization: str | None = Header(None)) -> dict[str, Any]:

@@ -2,7 +2,7 @@
 // It shows evidence with plain verdicts. There is no single integrity score: that needs a fusion
 // model fitted on labelled study data (P3, after data collection).
 
-import type { ExamReport, Finding, HabitValues, Report, ReportState } from "../api";
+import type { DecisionKind, ExamReport, Finding, HabitValues, Report, ReportState } from "../api";
 import { h } from "../dom";
 
 const STATE_TEXT: Record<ReportState, [string, string]> = {
@@ -16,6 +16,11 @@ const CHECK_TEXT: Record<Report["baseline"]["check"]["status"], string> = {
   not_confirmed: "Baseline check: does not match.",
   not_done: "Baseline check: not done yet.",
   unavailable: "Baseline check: could not run.",
+};
+export const DECISION_TEXT: Record<DecisionKind, string> = {
+  confirm: "Concern confirmed",
+  dismiss: "Dismissed: no concern",
+  inconclusive: "Inconclusive",
 };
 const STATUS_ICON: Record<Finding["status"], string> = { flag: "⚠", ok: "✓", info: "ℹ", unavailable: "–" };
 const SVG = "http://www.w3.org/2000/svg";
@@ -88,7 +93,31 @@ function habitsTable(base: HabitValues | null, exam: HabitValues | null): HTMLEl
   );
 }
 
-function examSection(ex: ExamReport, replayLink?: (sessionId: string) => string): HTMLElement {
+/** Reviewer decisions (the last one is current) and the participant's appeals (D-039). */
+function reviewSection(ex: ExamReport, extra: Node | null): HTMLElement | null {
+  const decisions = ex.decisions ?? [];
+  const appeals = ex.appeals ?? [];
+  if (!ex.closed) return null;
+  return h("section", { class: "review", id: `review-${ex.session_id.slice(0, 8)}` },
+    h("h3", {}, "Human review"),
+    decisions.length
+      ? h("ol", { class: "decisions" }, ...decisions.map((d, i) =>
+        h("li", { class: `decision decision-${d.decision}${i === decisions.length - 1 ? " decision-current" : ""}`, "data-decision": d.decision },
+          h("strong", {}, DECISION_TEXT[d.decision]),
+          h("span", { class: "muted" }, ` · ${new Date(d.at).toLocaleString()}${d.reviewer ? ` · ${d.reviewer}` : ""}`
+            + (i === decisions.length - 1 && decisions.length > 1 ? " · current" : "")),
+          d.notes ? h("p", { class: "decision-notes" }, d.notes) : null)))
+      : h("p", { class: "muted", id: "no-decision" }, "No reviewer decision yet."),
+    appeals.length
+      ? h("div", {}, h("h4", {}, "Participant's notes"),
+        h("ul", { class: "appeals" }, ...appeals.map((a) =>
+          h("li", { class: "appeal" }, h("span", { class: "muted" }, new Date(a.at).toLocaleString()), h("p", {}, a.note)))))
+      : null,
+    extra,
+  );
+}
+
+function examSection(ex: ExamReport, replayLink?: (sessionId: string) => string, reviewExtra?: (ex: ExamReport) => Node | null): HTMLElement {
   const chart = keystrokeChart(ex);
   return h("section", { class: "exam-report", "data-session": ex.session_id },
     h("h2", {}, `Exam: ${ex.problem_id}`, h("span", { class: "muted" },
@@ -111,10 +140,17 @@ function examSection(ex: ExamReport, replayLink?: (sessionId: string) => string)
     h("h3", {}, "Typing habits"),
     habitsTable(ex.habits.baseline, ex.habits.exam),
     replayLink ? h("p", {}, h("a", { href: replayLink(ex.session_id) }, "Replay this exam keystroke by keystroke")) : null,
+    reviewSection(ex, ex.closed && reviewExtra ? reviewExtra(ex) : null),
   );
 }
 
-export function renderReport(r: Report, opts: { replayLink?: (sessionId: string) => string } = {}): HTMLElement {
+export interface RenderOptions {
+  replayLink?: (sessionId: string) => string;
+  /** A form under each submitted exam's review history: the decision form or the appeal form. */
+  reviewExtra?: (ex: ExamReport) => Node | null;
+}
+
+export function renderReport(r: Report, opts: RenderOptions = {}): HTMLElement {
   const b = r.baseline;
   const baselineText = b.status === "ready"
     ? `Ready: ${b.windows} windows of typing from ${b.practice_sessions.length} practice task(s).`
@@ -133,7 +169,7 @@ export function renderReport(r: Report, opts: { replayLink?: (sessionId: string)
         h("strong", {}, CHECK_TEXT[b.check.status] + " "), b.check.detail),
       h("p", { class: "muted" }, b.note),
     ),
-    ...r.exams.map((ex) => examSection(ex, opts.replayLink)),
+    ...r.exams.map((ex) => examSection(ex, opts.replayLink, opts.reviewExtra)),
     h("section", { class: "report-notes" },
       h("p", {}, h("strong", {}, "No single score. "), r.no_score_note),
       h("p", {}, h("strong", {}, "False flags. "), r.false_flag_note),

@@ -972,6 +972,9 @@ Shown on the consent screen, the dashboard and in every report:
 - Reviewers see the §10.8 text on every case.
 - Participants can view their own case evidence and attach appeal notes.
 - In this research prototype, decisions have **no academic consequence**.
+- Built (D-039): decisions are append-only, so a later decision supersedes an earlier one but never
+  edits it. Decision notes and participant notes are encrypted at rest. A participant sees the outcome and
+  date of a decision, not the reviewer's identity or notes.
 
 ### 10.11 Synthetic data rules [BRIEF]
 
@@ -999,8 +1002,13 @@ Shown on the consent screen, the dashboard and in every report:
   §10.8 false-flag text and says that there is no single score yet.
 - Built by `backend/report.py` from `ml/session_features.py` (the same signal code offline and
   online). Rules are in `config/scoring.yaml → report`; they are hand-set and not calibrated.
-- Not yet built: the $\tilde S(t)$ timeline (needs the fusion model), decisions, appeals, and the
-  audit-log view.
+- **Human review (D-039, 2026-10-27).** Under each submitted exam the reviewer sees the decision
+  history and the participant's notes, and records a decision (concern confirmed / dismissed /
+  inconclusive) with required notes. The participant list has a Decision column. The participant's
+  report shows the outcome and date and lets them add a note. Admins open the access log from the
+  dashboard.
+- Not yet built: the $\tilde S(t)$ timeline (needs the fusion model), per-tick evidence, and the chain
+  verification status in the decision panel.
 
 The full design follows.
 

@@ -59,6 +59,20 @@ people, three runs, not an accuracy measurement). Reference line 2.13:
 | A different typist in the exam | confirmed (1.08, 1.54) | **3.95, 4.20, 4.14** | **Review**: typing rhythm |
 | A different typist in the check | **does not match** (4.26, 4.50) | 0.84, 1.48, 1.11 (still compared) | **Review**: baseline check |
 
+## Addition: reviewer decisions and student notes (D-039, 2026-10-27)
+
+The first part of P4, built after "continue".
+
+- **Reviewer decision.** Under each submitted exam on the dashboard: *concern confirmed*,
+  *dismissed* or *inconclusive*, with required notes. A new decision supersedes the last one; the
+  history stays and can't be edited, even directly in the database (append-only triggers).
+- **Student notes.** On their own report the student can add a note to a submitted exam, such as
+  "the pasted part is my own helper". The reviewer sees it next to the evidence.
+- **What the student sees.** The outcome and date of the decision, not who decided or their notes.
+- **Records.** Notes from both sides are encrypted at rest. Every decision and note is in the
+  access log, which admins open from the dashboard (reviewers can't). Erasure removes all of it.
+- The dashboard list has a **Decision** column ("Not reviewed" until someone decides).
+
 ## How it's built
 
 | Part | Where |
@@ -92,6 +106,7 @@ describe memorised English sentences, not code typing.
 |---|---|
 | Python | 334 passed. New: session signals 8, report rules 10, report API 3, serving model 2, problems 6 |
 | Playwright (Chromium, Firefox, WebKit) | 152 passed, 4 skipped. New: the full journey (practice → exam → own report → dashboard), and slow-Python start |
+| After D-038 hardening and D-039 (2026-10-27) | Python 351 passed (new: reviews API 3). Playwright 155 passed, 4 skipped (new: access log; the journey now adds a student note and a reviewer decision) |
 | Demo (Chromium, DEV, human-like scripted typing) | 3 practice tasks (3/3 each) and a typed exam (3/3). Baseline 4 windows, typing check ran on 3 exam windows, **No review flags** |
 
 The skips: the known WebKit clipboard case; the slow-start test (Chromium only, by design); and
@@ -107,7 +122,9 @@ scope (D-025); this stays an open question.
    from copying shown code (D-035), so genuine composing may sit further from it.
    **Expect false flags on the typing check** until P3 measures this.
 3. **The baseline is small:** about 4–6 windows from three short tasks.
-4. **No fused score, no AST features, no decisions or appeals in the dashboard yet.**
+4. **No fused score and no AST features yet.** Decisions and student notes now exist (D-039),
+   but there is one shared reviewer token, so "who decided" is the role ("reviewer-1"), not a
+   named person. Named reviewer accounts are needed before reviewers outside the team (Q4).
 5. **Report endpoints are not rate-limited.** That's fine on one laptop, but needed before any
    deployment.
 
@@ -118,5 +135,5 @@ scope (D-025); this stays an open question.
 2. **Confirm D-037** (minimum of 3 baseline windows), or ask for longer practice texts instead.
 3. **The rule thresholds** in `config/scoring.yaml → report`: keep them as the starting point for
    the pilot?
-4. **Next:** the rest of P3 (AST features, a fusion model fitted once study data exists) or P4
-   (reviewer decisions and appeals).
+4. **Next:** the rest of P3 (AST features, a fusion model fitted once study data exists), or the
+   rest of P4 (named reviewer accounts, chain-verification status in the decision panel).

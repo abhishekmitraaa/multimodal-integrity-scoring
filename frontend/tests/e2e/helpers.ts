@@ -7,6 +7,7 @@ import { expect, type APIRequestContext, type Page } from "@playwright/test";
 // Same rule as the backend (D-028): INTEGRITY_SECRETS_DIR, else ~/.integrity-exam/secrets.
 const SECRETS_DIR = process.env.INTEGRITY_SECRETS_DIR || join(homedir(), ".integrity-exam", "secrets");
 export const REVIEWER_TOKEN = readFileSync(join(SECRETS_DIR, "reviewer_token.txt"), "utf8").trim();
+export const ADMIN_TOKEN = readFileSync(join(SECRETS_DIR, "admin_token.txt"), "utf8").trim();
 export const API = "http://127.0.0.1:8000";
 
 export interface ServerEvent {

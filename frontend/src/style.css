@@ -361,3 +361,16 @@ button.task-done {
 .check-confirmed { border-left-color: var(--ok); }
 .check-not_confirmed { border-left-color: var(--warn); }
 .ks-chart .line-personal { stroke: var(--ok); stroke-dasharray: 2 3; stroke-width: 2; }
+
+/* Human review (D-039). */
+.review { margin-top: 16px; padding: 8px 12px; background: var(--panel); border: 1px solid var(--line); }
+.decisions, .appeals { padding-left: 20px; }
+.decision { padding: 4px 0; }
+.decision:not(.decision-current) { opacity: 0.7; }
+.decision-confirm strong { color: var(--error); }
+.decision-dismiss strong { color: var(--ok); }
+.decision-notes, .appeal p { margin: 2px 0 0; white-space: pre-wrap; }
+.review-form { display: grid; gap: 6px; margin-top: 12px; max-width: 640px; }
+.review-form textarea { width: 100%; font: inherit; }
+.review-form button { justify-self: start; }
+.decision-cell { white-space: nowrap; }

@@ -62,10 +62,17 @@ export const api = {
   closeSession: (id: string, token: string) =>
     call<{ n_events: number; head_hash: string; signed: boolean }>(`/api/sessions/${id}/close`, { method: "POST" }, token),
   myReport: (participantToken: string) => call<Report>("/api/me/report", {}, participantToken),
+  appeal: (sessionId: string, note: string, participantToken: string) =>
+    call<{ id: number; at: string }>("/api/me/appeals", { method: "POST", body: JSON.stringify({ session_id: sessionId, note }) }, participantToken),
   staff: {
     participants: (token: string) => call<ParticipantSummary[]>("/api/participants", {}, token),
     report: (pseudonym: string, token: string) => call<Report>(`/api/participants/${encodeURIComponent(pseudonym)}/report`, {}, token),
     sessions: (token: string) => call<Array<Record<string, unknown>>>("/api/sessions", {}, token),
+    decide: (sessionId: string, decision: DecisionKind, notes: string, token: string) =>
+      call<{ id: number; at: string; decision: DecisionKind; report_state: string }>(
+        `/api/sessions/${sessionId}/decision`, { method: "POST", body: JSON.stringify({ decision, notes }) }, token,
+      ),
+    accessLog: (token: string) => call<AccessLogEntry[]>("/api/access-log", {}, token),
     events: (id: string, token: string) => call<{ events: StaffEvent[] }>(`/api/sessions/${id}/events`, {}, token),
     verify: (id: string, token: string) =>
       call<{ ok: boolean; n_events: number; head_hash: string; first_bad_index: number | null; reason: string | null }>(
@@ -120,6 +127,34 @@ export interface ExamReport {
   };
   habits: { exam: HabitValues | null; baseline: HabitValues | null };
   pastes: Array<{ t: number; chars: number; provenance: string }>;
+  decisions?: Decision[];
+  appeals?: Appeal[];
+}
+
+// ---- reviewer workflow (D-039)
+
+export type DecisionKind = "confirm" | "dismiss" | "inconclusive";
+
+/** A reviewer decision. Participants get the outcome and date only; reviewers also see who and why. */
+export interface Decision {
+  decision: DecisionKind;
+  at: string;
+  reviewer?: string;
+  report_state?: string;
+  notes?: string;
+}
+
+export interface Appeal {
+  at: string;
+  note: string;
+}
+
+export interface AccessLogEntry {
+  at: string;
+  actor: string;
+  role: string;
+  action: string;
+  target: string;
 }
 
 export interface Report {
@@ -145,7 +180,8 @@ export interface ParticipantSummary {
   pseudonym: string;
   kind: string;
   created_at: string;
-  sessions: Array<{ session_id: string; kind: "practice" | "exam"; stage: Stage; problem_id: string; created_at: string; closed: boolean }>;
+  sessions: Array<{ session_id: string; kind: "practice" | "exam"; stage: Stage; problem_id: string; created_at: string; closed: boolean;
+    decision?: DecisionKind | null }>;
 }
 
 export type Stage = "baseline" | "check" | "exam";

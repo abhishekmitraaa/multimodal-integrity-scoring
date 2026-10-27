@@ -93,9 +93,9 @@ everything, press Ctrl+C and close the backend window.
 |---|---|---|
 | App: consent → tasks → Run/Test → Submit → "Another task" | http://127.0.0.1:5173/ | **yes** |
 | Real-keyboard check ([docs/keycheck.md](docs/keycheck.md)) | http://127.0.0.1:5173/#/keycheck | no |
-| Reviewer dashboard: every participant and their evidence report (reviewer token) | http://127.0.0.1:5173/#/dashboard | yes |
+| Reviewer dashboard: every participant, their evidence report and the reviewer's decision (reviewer token); the access log (admin token) | http://127.0.0.1:5173/#/dashboard | yes |
 | Reviewer replay (token in `~/.integrity-exam/secrets/reviewer_token.txt`) | http://127.0.0.1:5173/#/replay | yes |
-| A participant's own report (after submitting the exam) | http://127.0.0.1:5173/#/my-report | yes |
+| A participant's own report and notes for the reviewer (after submitting the exam) | http://127.0.0.1:5173/#/my-report | yes |
 
 The app creates `DEV-` participants. Real participants are refused until `real_collection_enabled`
 is set after ethics approval. If the backend isn't running, the consent page says so at the top and

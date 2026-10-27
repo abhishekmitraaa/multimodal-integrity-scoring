@@ -1,5 +1,6 @@
 // The whole journey (D-036): three practice tasks build a baseline, the exam is checked against it,
-// the participant sees their report, and a reviewer finds it on the dashboard. SYNTHETIC input.
+// the participant sees their report and adds a note, and a reviewer finds it on the dashboard and
+// records a decision (D-039). SYNTHETIC input.
 import { expect, test, type Page } from "@playwright/test";
 import { mod, REVIEWER_TOKEN } from "./helpers";
 
@@ -95,14 +96,42 @@ test("practice builds a baseline, the exam is checked, the report and dashboard 
     await expect(ks).toHaveClass(/finding-unavailable/);                // no model on this machine: said plainly
   }
 
+  // The participant adds a note for the reviewer (D-039).
+  const review = page.locator(".review");
+  await expect(review.locator("#no-decision")).toBeVisible();
+  const note = "The pasted part is my own helper from an earlier assignment.";
+  await review.locator("textarea").fill(note);
+  await review.locator("button.primary").click();
+  await expect(review.locator(".appeal")).toContainText(note);
+
   // The reviewer dashboard lists the participant and opens the same report.
   await page.goto("/#/dashboard");
   await page.fill("#dash-token", REVIEWER_TOKEN);
   await page.click("#dash-load");
   const row = page.locator(`tr[data-pseudonym="${pseudonym}"]`);
   await expect(row).toContainText("3 practice · check ✓ · 1 exam");
+  await expect(row.locator(".decision-cell")).toHaveText("Not reviewed");
   await row.locator("button").click();
   await expect(page.locator("#overall-verdict")).toContainText("Review recommended", { timeout: 60_000 });
   await expect(page.locator("#report a[href^='#/replay?session=']")).toHaveCount(1);
   await expect(page.locator(".ks-chart")).toHaveCount(modelRan ? 1 : 0);   // reviewers do see the distances
+
+  // The reviewer reads the participant's note and records a decision with notes (D-039).
+  await expect(review.locator(".appeal")).toContainText(note);
+  await review.locator("select").selectOption("inconclusive");
+  await review.locator("textarea").fill("short");
+  await review.locator("button.primary").click();
+  await expect(review.locator(".error")).toContainText("at least 10 characters");
+  const notes = "Paste is visible in the replay; asked the student to walk through it.";
+  await review.locator("textarea").fill(notes);
+  await review.locator("button.primary").click();
+  await expect(review.locator(".decision-current")).toContainText("Inconclusive");
+  await expect(review.locator(".decision-current")).toContainText(notes);
+  await expect(row.locator(".decision-cell")).toHaveText("Inconclusive");
+
+  // The participant sees the outcome and date, not the reviewer's notes.
+  await page.goto("/#/my-report");
+  await expect(review.locator(".decision-current")).toContainText("Inconclusive", { timeout: 60_000 });
+  await expect(review).not.toContainText(notes);
+  await expect(review).not.toContainText("reviewer-1");
 });
