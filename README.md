@@ -55,10 +55,10 @@ The full design is in [docs/SPEC.md](docs/SPEC.md) and decisions are logged in
 | P0 | Repo skeleton and spec | approved with changes |
 | P1 | Capture app, server log, replay | approved ([report](docs/phase-reports/P1.md)) |
 | P2 | Keystroke features and baseline model on public data | **approved** ([report](docs/phase-reports/P2.md)): TypeNet reproduced within every acceptance band on the Aalto data; human real-keyboard check still open |
-| P3 | Enrollment, process/AST/clipboard features, fusion, thresholds | started: baseline from practice, exam checked against it, evidence rules and reconciliation (D-036). Not yet: AST features, fusion model, calibrated thresholds |
-| P4 | Reviewer dashboard | started: participant list, evidence report, replay links, the participant's own report (D-036). Not yet: decisions, appeals, audit-log view |
-| P5 | Data collection tooling, evaluation harness, attack report | not started; ethics checklist first |
-| P6 | Paper and patent-support documents | not started |
+| P3 | Enrollment, process/AST/clipboard features, fusion, thresholds | **built** (D-036 to D-045): baseline from practice + baseline check, all four signal types (keystroke, process, AST, clipboard), evidence report, server-side reconciliation, sign-constrained fusion pipeline tested end to end on SYNTHETIC data. The fused score itself needs study data. |
+| P4 | Reviewer dashboard | **built** (D-039, D-041, D-044): reports, replay, hash-chain check, decisions with notes, student notes, access log, named reviewer accounts |
+| P5 | Data collection tooling, evaluation harness, attack report | **tooling built** (D-042, D-046, D-047): governance guard, withdrawal, retention job, study protocol (Latin square, role-play conditions, frozen LLM material, sitting rules), scripted attacks, D2 export and evaluation harness. Waiting on ethics approval for real collection. |
+| P6 | Paper and patent-support documents | not started (needs D2 results) |
 
 ## Setup (Windows; use `.venv/bin/python` on Linux/macOS)
 
