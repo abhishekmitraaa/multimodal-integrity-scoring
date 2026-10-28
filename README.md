@@ -1,139 +1,174 @@
 # Personalized Multi-Modal Integrity Scoring for Live Coding Exams
 
-University prototype for VIT BITE308L, built by a 3-person team.
+**Was this code written by the student sitting the exam?** This system watches *how* code arrives in
+the editor — typing rhythm, the writing process, code structure and pastes — compares it with each
+student’s own baseline, and gives a human reviewer the evidence. It never accuses anyone on its own.
 
-This is a web-based live coding exam environment. It records keystroke timing, clipboard events and
-code snapshots in a Monaco editor. It builds a per-student baseline from 2–3 short practice modules,
-and during an exam it produces a continuous integrity confidence score $S \in [0,1]$ (high =
-genuine). Sessions with a low score go to a human reviewer. **Nothing is ever acted on
-automatically.**
+*Python 3.11 · FastAPI · PostgreSQL · PyTorch · TypeScript · Monaco · tree-sitter* — built for VIT’s
+BITE308L by Sneha, Abhishek Mitra and Mehul Kumar Srivastava.
 
-The full design is in [docs/SPEC.md](docs/SPEC.md) and decisions are logged in
-[docs/DECISIONS.md](docs/DECISIONS.md).
+---
 
-## What this system can and cannot show
+## Highlights
 
-- Keystroke timing proves a human was typing, not that the human was the author. Timing-only
-  detection is weak against transcribing LLM output from a second device (copy-type) and against
-  timing-forgery auto-typers.
-- Therefore the system fuses four signals: (1) keystroke identity distance, (2) process features from
-  the edit stream, (3) AST drift normalised per problem, (4) clipboard and paste metrics.
-- Few-shot enrollment already exists in keystroke biometrics. TypeNet reports 4.5% EER at 1
-  enrollment sequence and 1.2% at 10, for 70-keystroke sequences of short memorised English
-  sentences, 1,000 test subjects and per-subject thresholds. The figures are checked against the
-  arXiv text; see [docs/p2_protocol.md](docs/p2_protocol.md). Our contribution is code-domain
-  adaptation, fusion, the calibration protocol and an adversarial evaluation. We do not claim
-  more.
-- Population AI-code detectors fail across domains and under humanising (a source is required by
-  Phase 6). AST drift is a weak signal used only in fusion.
-- A low score means "a human should look". It is not evidence of misconduct. Accessibility needs,
-  injury, fatigue, mood and keyboard or device changes all cause false flags.
-- The score S is defined so that high = genuine. The fusion inputs are anomaly distances, so their
-  learned weights are constrained to be non-positive.
-- Client-side telemetry can be forged by whoever controls the browser, and `isTrusted` is not a
-  defence. The hash chain shows tampering after data reaches the server, not forging at the source.
-  Server-side reconciliation of edits against keystrokes (Phase 3) raises the cost of naive
-  forging only.
+- **A complete exam platform** — a self-hosted web exam with a locked-down code editor, live capture
+  of every key press, edit and paste, Python tests in the browser, and a reviewer dashboard.
+- **A personal baseline from three short tasks** — no long history needed; a held-out *baseline
+  check* tests the baseline before it is trusted.
+- **Four signals, one score** — keystroke rhythm, writing process, code structure (AST) and
+  clipboard behaviour, fused into an integrity score S ∈ [0, 1] with a model that can never treat
+  more anomaly as more genuine.
+- **A reproduced deep keystroke model** — our TypeNet-style encoder matches all **10 of 10**
+  published results within pre-registered bands on 168,593 people (e.g. **1.57%** equal error rate
+  vs 1.7% published), 15–20× better than classic statistical baselines.
+- **Tamper-evident by design** — an encrypted, append-only, hash-chained event log; the server
+  re-checks every edit against the key presses instead of trusting the browser.
+- **Human in the loop** — evidence chart, keystroke-by-keystroke replay, tamper check, decisions
+  with required notes, named reviewer accounts and a full access log.
+- **Privacy built in** — records only the editor, pseudonyms, encryption at rest, one-click
+  withdrawal, a retention job, and a hard lock on real data collection until ethics approval.
+- **Research-grade evaluation, ready to run** — a two-sitting study protocol with balanced role-play
+  attacks, scripted auto-typers, and a nested cross-validation harness with bootstrap confidence
+  intervals.
+- **Tested** — about 430 Python tests and 160 browser tests across Chromium, Firefox and WebKit;
+  every design decision logged in [docs/DECISIONS.md](docs/DECISIONS.md).
+
+## How it works
+
+```
+ Practice tasks ×3 ─► baseline check ─► exam                      Reviewer dashboard
+        │                  │              │                               ▲
+        ▼                  ▼              ▼                               │
+  ┌─────────────────────────────────────────────┐    ┌──────────────────────────────────────┐
+  │ Browser: Monaco editor + capture             │    │ Server: FastAPI                       │
+  │ keys · edits · pastes · focus · snapshots ───┼───►│ validate · order · encrypt · hash-chain│
+  └─────────────────────────────────────────────┘ WS │ features → evidence → score S ─────────┼─► report
+                                                     └──────────────────────────────────────┘
+```
+
+| Signal | What it measures | How |
+|---|---|---|
+| Keystroke rhythm | Exam typing vs the student’s own practice typing | TypeNet-style LSTM encoder, distance to a personal prototype |
+| Writing process | Bursts, pauses, corrections, linearity, how much typed text survives (14 features) | Computed from the event stream |
+| Code structure | Structure that appears without typing; style drift | tree-sitter AST, Jensen–Shannon divergence |
+| Clipboard & focus | Pastes from outside the editor, leaving the window | Paste fingerprints, focus events |
+
+Plus **server-side reconciliation**: text that appears without matching key presses or a recorded
+paste is flagged, whatever the browser claims.
+
+## Results so far
+
+| Enrollment samples (G) | 1 | 2 | 5 | 7 | 10 |
+|---|---|---|---|---|---|
+| Our EER (70-key windows) | 4.11% | 2.65% | 1.57% | 1.33% | 1.17% |
+| TypeNet, published | 4.5% | 2.8% | 1.7% | 1.4% | 1.2% |
+
+Aalto “136M Keystrokes” data, 67,000 training / 1,000 validation / 1,000 test subjects; protocol and
+acceptance bands fixed before training. Details: [docs/phase-reports/P2-results.md](docs/phase-reports/P2-results.md).
+
+The full system runs end to end. Detection rates on real students will come from the planned study
+(30–50 consenting students, two sittings), which awaits ethics approval — see
+[docs/SPEC.md §12](docs/SPEC.md).
+
+## What it is — and isn’t
+
+- Keystroke timing shows that a person typed and whether it looks like *this* person; it does not
+  prove who wrote the code. That is why four signals are combined and a person always decides.
+- The browser belongs to the student and can be forged; the hash chain shows tampering after data
+  reaches the server, and reconciliation raises the cost of forging.
+- Few-shot keystroke enrollment is prior work (TypeNet); our contribution is applying it to code,
+  fusing it with process, structure and clipboard signals, calibration and an attack evaluation.
+- A flag means “a person should look”. Accessibility needs, injury, fatigue or a new keyboard can
+  all change typing.
+- The optional webcam recording is a demo feature for test accounts; it is not analysed, and its
+  head/eye-movement panel is a video demonstration with example output.
+
+## Quick start (Windows)
+
+You need Python 3.11, Node 22+ and Docker Desktop.
+
+```powershell
+py -3.11 -m venv .venv
+.venv\Scripts\python -m pip install -r requirements-dev.txt -e "backend[dev]" -e ml -e eval
+.venv\Scripts\python scripts\make_secrets.py          # keys and tokens in ~\.integrity-exam\secrets (outside the repo)
+cd frontend; npm install; npx playwright install chromium firefox webkit; cd ..
+powershell -ExecutionPolicy Bypass -File scripts\dev.ps1
+```
+
+`dev.ps1` starts the database, runs the migrations, starts the API on :8000 and the web app on
+:5173. Then open:
+
+| Page | URL |
+|---|---|
+| Student: consent → practice → baseline check → exam | http://127.0.0.1:5173/ |
+| Study mode: six tasks with role-play conditions | http://127.0.0.1:5173/?study=1#/ |
+| Reviewer dashboard (token in `~\.integrity-exam\secrets\reviewer_token.txt`) | http://127.0.0.1:5173/#/dashboard |
+| Real-keyboard timing check | http://127.0.0.1:5173/#/keycheck |
+
+The keystroke model is not in the repository (it is trained on the Aalto dataset, licensed for
+non-commercial research). Without it the app runs and the report says the typing check is
+unavailable; to train it, see [docs/p2_protocol.md](docs/p2_protocol.md). PyTorch with CUDA:
+`pip install torch --index-url https://download.pytorch.org/whl/cu128`.
+
+<details><summary>Manual start (what the script does)</summary>
+
+```powershell
+docker compose up -d db
+$env:INTEGRITY_DATA_ROOT = "C:\integrity-data"      # must be outside the repo and any cloud-synced folder
+.venv\Scripts\python -m alembic -c backend\alembic.ini upgrade head
+.venv\Scripts\python -m integrity_backend.app       # terminal 1: API on :8000
+cd frontend; npm run dev                            # terminal 2: web app on :5173
+```
+</details>
+
+<details><summary>Admin and research tools</summary>
+
+| Task | Command |
+|---|---|
+| Named reviewer account (token shown once) | `python scripts/staff_accounts.py add <handle> --role reviewer` |
+| Retention job (dry run; `--apply` to delete) | `python scripts/purge_retention.py` |
+| Encrypted backup of the keys | `python scripts/backup_secrets.py backup <file on a USB drive>` |
+| Detection demo with scripted typists | `node eval/tools/detection_demo/detection_demo.cjs` |
+| Evaluation pipeline on synthetic data (tests the code, not a result) | `cd eval; python -m integrity_eval.fusion_dryrun --out <...synthetic...md>` |
+| Study data export and evaluation (after ethics approval) | `python -m integrity_eval.d2_export` / `d2_eval` |
+</details>
+
+## Tests
+
+```powershell
+.venv\Scripts\python -m pytest          # Python tests (the database tests need `docker compose up -d db`)
+cd frontend; npx playwright test        # browser tests; start their own backend and web app
+```
 
 ## Repository layout
 
 | Path | Contents |
 |---|---|
-| [frontend/](frontend/) | Monaco exam app, practice modules, consent, reviewer dashboard (TypeScript, Vite, Playwright) |
-| [backend/](backend/) | FastAPI + WebSocket ingest, hash chain, storage, replay, scoring, review and privacy APIs |
-| [ml/](ml/) | Features (keystroke, process, AST, clipboard), keystroke encoder, digraph baseline, fusion, calibration |
-| [eval/](eval/) | Adversarial harness A1–A8, splits, metrics, bootstrap CIs, reports |
-| [shared/schema/](shared/schema/) | Event wire contract (JSON Schema) and synthetic example batches |
-| [config/](config/) | All tunables as YAML |
-| [docs/](docs/) | Spec, decisions, phase reports |
-| [data/](data/) | Local data root. Only labelled synthetic fixtures are committed. |
+| [frontend/](frontend/) | Exam app, capture, study mode, reviewer dashboard (TypeScript, Vite, Playwright) |
+| [backend/](backend/) | FastAPI + WebSocket ingest, hash chain, storage, replay, reports, review, privacy and study APIs |
+| [ml/](ml/) | Keystroke, process, AST and clipboard features; the encoder; fusion; smoothing |
+| [eval/](eval/) | TypeNet reproduction, evaluation harness, synthetic sessions, attack runner, detection demo |
+| [config/](config/) | Every setting, as YAML |
+| [shared/schema/](shared/schema/) | The event wire format (JSON Schema) |
+| [docs/](docs/) | Specification, decision log, phase reports, demo and review guides, project report |
 
-## Phase status
+## Documentation
 
-| Phase | Scope | Status |
-|---|---|---|
-| P0 | Repo skeleton and spec | approved with changes |
-| P1 | Capture app, server log, replay | approved ([report](docs/phase-reports/P1.md)) |
-| P2 | Keystroke features and baseline model on public data | **approved** ([report](docs/phase-reports/P2.md)): TypeNet reproduced within every acceptance band on the Aalto data; human real-keyboard check still open |
-| P3 | Enrollment, process/AST/clipboard features, fusion, thresholds | **built** (D-036 to D-045): baseline from practice + baseline check, all four signal types (keystroke, process, AST, clipboard), evidence report, server-side reconciliation, sign-constrained fusion pipeline tested end to end on SYNTHETIC data. The fused score itself needs study data. |
-| P4 | Reviewer dashboard | **built** (D-039, D-041, D-044): reports, replay, hash-chain check, decisions with notes, student notes, access log, named reviewer accounts |
-| P5 | Data collection tooling, evaluation harness, attack report | **tooling built** (D-042, D-046, D-047): governance guard, withdrawal, retention job, study protocol (Latin square, role-play conditions, frozen LLM material, sitting rules), scripted attacks, D2 export and evaluation harness. Waiting on ethics approval for real collection. |
-| P6 | Paper and patent-support documents | not started (needs D2 results) |
+- [docs/SPEC.md](docs/SPEC.md) — the full specification
+- [docs/DECISIONS.md](docs/DECISIONS.md) — every design decision and why
+- [docs/reports/Project_Report_Review2.pdf](docs/reports/Project_Report_Review2.pdf) — project report
+- [docs/DEMO.md](docs/DEMO.md) — a 15-minute demo walkthrough
+- [docs/phase-reports/](docs/phase-reports/) — what each phase delivered
 
-## Setup (Windows; use `.venv/bin/python` on Linux/macOS)
+## Team
 
-The repository lives at `C:\dev\integrity-exam`, outside OneDrive. You need Python 3.11 (pinned),
-Node 22+ and Docker Desktop.
+Sneha (24BIT0228) · Abhishek Mitra (24BIT0477) · Mehul Kumar Srivastava (24BIT0251) —
+Vellore Institute of Technology, BITE308L.
 
-```bash
-py -3.11 -m venv .venv
-.venv/Scripts/python -m pip install -r requirements-dev.txt -e "backend[dev]" -e ml -e eval
-.venv/Scripts/python scripts/make_secrets.py        # keys and tokens in ~/.integrity-exam/secrets (outside the repo)
-docker compose up -d db                              # PostgreSQL 16 on 127.0.0.1:5432
-cd frontend && npm install && npx playwright install chromium firefox webkit
-# P2 encoder only: PyTorch with CUDA (about 3 GB)
-.venv/Scripts/python -m pip install torch --index-url https://download.pytorch.org/whl/cu128
-```
+## Licence
 
-## Running the app locally (development data only)
+No licence is granted: **all rights reserved**. You may view the code on GitHub, but copying,
+modifying or redistributing it needs the authors’ permission.
 
-One command, from the repository root, starts everything in order:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\dev.ps1
-```
-
-It starts Docker Desktop if needed, waits for the database, sets `INTEGRITY_DATA_ROOT`
-(`C:\integrity-data` unless already set; `-DataRoot D:\...` to change it) and runs the migrations.
-Then it starts the **backend API on :8000 in its own window** and the **web app on :5173** in this
-window, cross-origin isolated. It stops with a plain message if any step fails. To stop
-everything, press Ctrl+C and close the backend window.
-
-| Page | URL | Needs the backend |
-|---|---|---|
-| App: consent → tasks → Run/Test → Submit → "Another task" | http://127.0.0.1:5173/ | **yes** |
-| Real-keyboard check ([docs/keycheck.md](docs/keycheck.md)) | http://127.0.0.1:5173/#/keycheck | no |
-| Reviewer dashboard: every participant, their evidence report and the reviewer's decision (reviewer token); the access log (admin token) | http://127.0.0.1:5173/#/dashboard | yes |
-| Reviewer replay (token in `~/.integrity-exam/secrets/reviewer_token.txt`) | http://127.0.0.1:5173/#/replay | yes |
-| A participant's own report and notes for the reviewer (after submitting the exam) | http://127.0.0.1:5173/#/my-report | yes |
-
-Fusion pipeline dry run on SYNTHETIC sessions (tests the code, never a result):
-`cd eval; python -m integrity_eval.fusion_dryrun --out D:\integrity-data\derived\fusion_dryrun\fusion_dryrun_synthetic.md`.
-
-Reviewer accounts: `python scripts/staff_accounts.py add <handle> --role reviewer` (prints the
-token once), `list`, `disable <handle>`.
-
-Participants can withdraw on the tasks page (all their data is erased). The retention job is
-`python scripts/purge_retention.py` (dry run; `--apply` to erase), using the dates in
-`config/privacy.yaml → governance`.
-
-The app creates `DEV-` participants. Real participants are refused until `real_collection_enabled`
-is set after ethics approval. If the backend isn't running, the consent page says so at the top and
-disables Continue.
-
-<details><summary>Manual steps (what the script does)</summary>
-
-```powershell
-docker compose up -d db
-$env:INTEGRITY_DATA_ROOT = "C:\integrity-data"      # must be outside the repo and cloud sync
-.venv\Scripts\python -m alembic -c backendlembic.ini upgrade head
-.venv\Scripts\python -m integrity_backend.app       # terminal 1: API on :8000
-cd frontend; npm run dev                            # terminal 2: web app on :5173 ($env:COI = "0" only to measure without isolation)
-```
-</details>
-
-## Running the tests
-
-```bash
-.venv/Scripts/python -m pytest          # all Python tests; the database tests need `docker compose up -d db`
-cd frontend && npx playwright test      # starts its own backend on a throwaway database, plus Vite
-```
-
-## Data rules
-
-- Synthetic data is used only for pipeline tests. It is labelled "synthetic" in code, filenames and
-  reports, and is never reported as a result.
-- No real participant data is collected until the ethics and consent checklist (Phase 5) is
-  approved.
-- Participant data must never be stored inside this repository or any cloud-synced folder. See
-  `config/privacy.yaml`.
+Data rules: participant data is never stored in this repository or in a cloud-synced folder;
+synthetic data is labelled as such and never reported as a result.
