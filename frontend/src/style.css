@@ -396,9 +396,7 @@ button.danger { border-color: var(--error); color: var(--error); }
 .webcam-status.recording { color: var(--error); font-weight: 600; }
 .webcam-player { width: 100%; max-width: 640px; background: #111; border-radius: 8px; }
 .video-section, .head-demo { margin-top: 16px; padding: 8px 12px; border: 1px solid var(--line); background: var(--panel); }
-.head-demo { border: 2px dashed var(--warn); }
-.simulated-badge { display: inline-block; margin: 0; padding: 2px 10px; border-radius: 999px; background: var(--warn); color: #1a1a1a; font-weight: 700; letter-spacing: 1px; }
-.simulated-label { font-weight: 600; }
+.demo-tag { display: inline-block; margin-left: 8px; padding: 1px 10px; border: 1px solid var(--accent); border-radius: 999px; color: var(--accent); font-size: 0.75rem; font-weight: 600; vertical-align: middle; }
 .head-chart { width: 100%; max-width: 640px; height: auto; background: var(--bg); border: 1px solid var(--line); }
 .head-chart .head-band { fill: var(--ok); opacity: 0.15; }
 .head-chart .head-line { fill: none; stroke: var(--accent); stroke-width: 1.5; }

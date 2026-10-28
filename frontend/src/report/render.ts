@@ -120,28 +120,27 @@ function videoSection(ex: ExamReport, loadVideo?: (sessionId: string) => Promise
     loadVideo ? load : null, holder);
 }
 
-/** The head-movement panel (D-048): SIMULATED numbers for the demo, said on the panel itself. */
+/** The head-movement panel (D-048): a video demonstration with example numbers, said on the panel itself. */
 function headDemoPanel(d: HeadMovementDemo | undefined): HTMLElement | null {
   if (!d) return null;
   const W = 640, H = 160, L = 40, T = 10, B = 24;
   const tMax = Math.max(1, ...d.samples.map((s) => s.t));
   const x = (t: number) => L + (t / tMax) * (W - L - 8);
   const y = (yaw: number) => T + (1 - (Math.max(-70, Math.min(70, yaw)) + 70) / 140) * (H - T - B);
-  const chart = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "head-chart", role: "img", "aria-label": "Simulated head turn over time" });
+  const chart = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "head-chart", role: "img", "aria-label": "Example head turn over time (video demonstration)" });
   chart.append(svg("rect", { x: L, y: y(30), width: W - L - 8, height: y(-30) - y(30), class: "head-band" }));
   chart.append(svg("polyline", { points: d.samples.map((s) => `${x(s.t)},${y(s.yaw)}`).join(" "), class: "head-line" }));
   chart.append(svg("text", { x: 4, y: y(0) + 4, class: "tick" }, "0°"));
   chart.append(svg("text", { x: 4, y: y(45) + 4, class: "tick" }, "R"));
   chart.append(svg("text", { x: 4, y: y(-45) + 4, class: "tick" }, "L"));
   return h("section", { class: "head-demo", id: "head-demo" },
-    h("p", { class: "simulated-badge" }, "SIMULATED"),
-    h("h3", {}, "Head movement (demo)"),
-    h("p", { class: "simulated-label" }, d.label),
+    h("h3", {}, "Head movement ", h("span", { class: "demo-tag" }, "Video demonstration")),
+    h("p", { class: "muted demo-note" }, d.label),
     h("figure", { class: "chart-figure" }, chart,
-      h("figcaption", { class: "muted" }, "Simulated head turn left/right over the exam; the shaded band is facing the screen (within 30°).")),
+      h("figcaption", { class: "muted" }, "Head turn left/right over the exam; the shaded band is facing the screen (within 30°).")),
     h("ul", {},
-      h("li", {}, `Facing the screen: ${Math.round(d.facing_screen_share * 100)}% of the time (simulated)`),
-      h("li", {}, `Looks away: ${d.look_aways.length}, longest ${d.longest_look_away_s} s (simulated)`)),
+      h("li", {}, `Facing the screen: ${Math.round(d.facing_screen_share * 100)}% of the time`),
+      h("li", {}, `Looks away: ${d.look_aways.length}, longest ${d.longest_look_away_s} s`)),
   );
 }
 

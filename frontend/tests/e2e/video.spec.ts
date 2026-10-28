@@ -1,6 +1,6 @@
 // Webcam recording during the exam (D-048, a demo feature): Chromium's fake camera stands in for a
 // real one. The participant ticks the separate box; the exam records; an admin can play it back; the
-// reviewer token cannot; the head-movement panel says SIMULATED. SYNTHETIC (dev tester).
+// reviewer token cannot; the head-movement panel is labelled a video demonstration. SYNTHETIC (dev tester).
 import { expect, test } from "@playwright/test";
 import { ADMIN_TOKEN, REVIEWER_TOKEN } from "./helpers";
 
@@ -37,8 +37,8 @@ test("the webcam records during the exam and an admin can play it back", async (
   await expect(page.locator(".video-section")).toContainText("only an admin can view it");
   await page.locator(".video-section button").click();
   await expect(page.locator(".video-section .error")).toHaveText("Viewing the video needs the admin token.");
-  await expect(page.locator("#head-demo .simulated-badge")).toHaveText("SIMULATED");
-  await expect(page.locator("#head-demo")).toContainText("not computed from the video");
+  await expect(page.locator("#head-demo .demo-tag")).toHaveText("Video demonstration");
+  await expect(page.locator("#head-demo")).toContainText("the video is not analysed yet");
 
   await page.fill("#dash-token", ADMIN_TOKEN);
   await page.click("#dash-load");
