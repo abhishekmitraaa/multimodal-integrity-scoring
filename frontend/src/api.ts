@@ -52,7 +52,7 @@ async function call<T>(path: string, init: RequestInit = {}, token?: string): Pr
 
 export const api = {
   health: () => call<{ status: string }>("/api/health"),
-  clientConfig: () => call<{ policy: EditorPolicy; capture: CaptureSettings; notice: NoticeFields; video: { kinds: string[]; chunk_ms: number } }>("/api/client-config"),
+  clientConfig: () => call<{ policy: EditorPolicy; capture: CaptureSettings; notice: NoticeFields; participant_report: boolean; video: { kinds: string[]; chunk_ms: number } }>("/api/client-config"),
   problem: (id: string) => call<Problem>(`/api/problems/${id}`),
   createParticipant: (body: unknown) =>
     call<{ pseudonym: string; participant_token: string }>("/api/participants", { method: "POST", body: JSON.stringify(body) }),
@@ -83,10 +83,10 @@ export const api = {
         `/api/sessions/${sessionId}/decision`, { method: "POST", body: JSON.stringify({ decision, notes }) }, token,
       ),
     accessLog: (token: string) => call<AccessLogEntry[]>("/api/access-log", {}, token),
-    /** The session's webcam recording (D-048); admin token only. */
+    /** The session's webcam recording (D-048); reviewer or admin token (D-049). */
     video: async (sessionId: string, token: string): Promise<Blob> => {
       const res = await fetch(`/api/admin/sessions/${sessionId}/video`, { headers: { Authorization: `Bearer ${token}` } });
-      if (res.status === 403) throw new Error("Viewing the video needs the admin token.");
+      if (res.status === 403) throw new Error("Viewing the video needs a reviewer or admin token.");
       if (!res.ok) throw new Error(`video: ${res.status}`);
       return res.blob();
     },

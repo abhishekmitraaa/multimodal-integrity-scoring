@@ -26,6 +26,7 @@ signing:                         # deferred (D-017)
   algorithm: ed25519
   key_file: chain_signing_key.pem
 access_log: true
+participant_report: false        # D-049 (lead's decision): students see no report and add no notes; true restores SPEC 10.10 own-report access
 video:                           # D-048: webcam recording during exam tasks, a DEMO feature (lead's request, 2026-10-28)
   kinds: [dev, synthetic]        # never real participants: adding real needs ethics approval that covers video AND ethics_approved_for_video
   ethics_approved_for_video: false

@@ -1,12 +1,12 @@
 // Webcam recording during the exam (D-048, a demo feature): Chromium's fake camera stands in for a
-// real one. The participant ticks the separate box; the exam records; an admin can play it back; the
-// reviewer token cannot; the head-movement panel is labelled a video demonstration. SYNTHETIC (dev tester).
+// real one. The participant ticks the separate box; the exam records; the reviewer can play it back
+// (D-049); the head-movement panel is labelled a video demonstration. SYNTHETIC (dev tester).
 import { expect, test } from "@playwright/test";
-import { ADMIN_TOKEN, REVIEWER_TOKEN } from "./helpers";
+import { REVIEWER_TOKEN } from "./helpers";
 
 test.use({ launchOptions: { args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"] } });
 
-test("the webcam records during the exam and an admin can play it back", async ({ page, browserName }) => {
+test("the webcam records during the exam and the reviewer can play it back", async ({ page, browserName }) => {
   test.skip(browserName !== "chromium", "the fake camera flags are Chromium's");
   test.setTimeout(180_000);
   await page.goto("/#/");
@@ -34,17 +34,11 @@ test("the webcam records during the exam and an admin can play it back", async (
   await page.click("#dash-load");
   await page.locator(`tr[data-pseudonym="${pseudonym}"] button`).click();
   await expect(page.locator("#overall-verdict")).toBeVisible({ timeout: 60_000 });      // the first report loads the model
-  await expect(page.locator(".video-section")).toContainText("only an admin can view it");
-  await page.locator(".video-section button").click();
-  await expect(page.locator(".video-section .error")).toHaveText("Viewing the video needs the admin token.");
+  await expect(page.locator(".video-section")).toContainText("reviewers and admins can view it");
   await expect(page.locator("#head-demo .demo-tag")).toHaveText("Video demonstration");
   await expect(page.locator("#head-demo")).toContainText("Head and eye movement analysis modelling: in development, example output");
 
-  await page.fill("#dash-token", ADMIN_TOKEN);
-  await page.click("#dash-load");
-  await page.locator(`tr[data-pseudonym="${pseudonym}"] button`).click();
-  await expect(page.locator(".video-section button")).toBeVisible({ timeout: 60_000 });
-  await page.locator(".video-section button").click();
+  await page.locator(".video-section button").click();                    // the reviewer watches it (D-049)
   const player = page.locator(".video-section video");
   await expect(player).toHaveAttribute("src", /^blob:/);
   await expect.poll(() => player.evaluate((v: HTMLVideoElement) => v.readyState), { timeout: 20_000 }).toBeGreaterThan(0);

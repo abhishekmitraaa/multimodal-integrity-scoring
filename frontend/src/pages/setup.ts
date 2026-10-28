@@ -37,7 +37,8 @@ export async function setupPage(root: HTMLElement): Promise<void> {
   const error = h("p", { class: "error" });
   const done = new Set(store.done());
   // Study participants (D-046) get their own sitting-2 plan: six tasks, each with a role-play condition.
-  const plan = await api.plan(participant.token).catch(() => null);
+  const [plan, config] = await Promise.all([api.plan(participant.token).catch(() => null), api.clientConfig().catch(() => null)]);
+  if (!location.hash.startsWith("#/setup")) return;         // the user moved on while this loaded: don't draw over it
   const slots = plan?.study ? plan.slots : [];
   const tasks = slots.length
     ? [...PROBLEMS.filter((p) => p.stage !== "exam"),
@@ -99,7 +100,7 @@ export async function setupPage(root: HTMLElement): Promise<void> {
       !checkDone ? " Do the baseline check first." : ""),
       opens && opens > new Date() ? h("p", { class: "banner", id: "sitting2-opens" }, `Sitting 2 opens on ${opens.toLocaleString()}.`) : null,
       h("div", { class: slots.length ? "slots" : "row", id: "exam-tasks" }, ...examButtons),
-      examDone ? h("p", {}, h("a", { href: "#/my-report", id: "setup-report" }, "See your report")) : null,
+      examDone && config?.participant_report ? h("p", {}, h("a", { href: "#/my-report", id: "setup-report" }, "See your report")) : null,
       error,
       withdrawPanel(participant),
     ),

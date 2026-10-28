@@ -996,7 +996,8 @@ Shown on the consent screen, the dashboard and in every report:
 - Reviewers must record a decision (`confirm`, `dismiss`, `inconclusive`) with notes, under their own
   named account (D-044); the shared development token is refused once real collection is on.
 - Reviewers see the §10.8 text on every case.
-- Participants can view their own case evidence and attach appeal notes.
+- Participants can view their own case evidence and attach appeal notes. **Changed (D-049):** off by default
+  (`privacy.participant_report`); students leave after the exam and reports are for reviewers.
 - In this research prototype, decisions have **no academic consequence**.
 - Built (D-039): decisions are append-only, so a later decision supersedes an earlier one but never
   edits it. Decision notes and participant notes are encrypted at rest. A participant sees the outcome and

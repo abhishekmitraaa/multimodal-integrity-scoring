@@ -304,6 +304,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         """Everything the capture client needs from config/, so the browser hard-codes nothing."""
         video = settings.privacy.get("video") or {}
         return {"policy": policy, "capture": settings.capture, "notice": governance.notice_fields(settings.privacy),
+                "participant_report": bool(settings.privacy.get("participant_report", False)),
                 "video": {"kinds": list(video.get("kinds", [])), "chunk_ms": int(video.get("chunk_ms", 5000))}}
 
     @app.get("/api/problems/{problem_id}")
@@ -392,8 +393,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/api/admin/sessions/{session_id}/video")
     async def view_video(session_id: str, authorization: str | None = Header(None)) -> Response:
-        """The session's webcam recording, for admins only; every viewing is in the access log."""
-        actor, role = await staff(authorization, admin_only=True)
+        """The session's webcam recording, for reviewers and admins (D-049); every viewing is in the access log."""
+        actor, role = await staff(authorization)
         session_id = Store.canonical(session_id)
         if not await store().log_access_about(actor, role, "view_video", session_id=session_id):
             raise HTTPException(404, "unknown session")
@@ -582,9 +583,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         saved = await store().add_decision(sid, actor, body.decision, state, body.notes)
         return {**saved, "decision": body.decision, "report_state": state}
 
+    def own_report_enabled() -> None:
+        if not settings.privacy.get("participant_report", False):    # D-049: reports are for reviewers only
+            raise HTTPException(404, "reports are not shown to participants")
+
     @app.post("/api/me/appeals")
     async def add_appeal(body: AppealIn, authorization: str | None = Header(None)) -> dict[str, Any]:
         """A participant's note on their own submitted exam (SPEC 10.10)."""
+        own_report_enabled()
         pseudonym = await store().participant_by_token(_bearer(authorization))
         if pseudonym is None:
             raise HTTPException(403, "not authorised")
@@ -615,7 +621,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/api/me/report")
     async def own_report(authorization: str | None = Header(None)) -> dict[str, Any]:
-        """A participant's own report (SPEC 10.10: participants can view their own evidence)."""
+        """A participant's own report (SPEC 10.10), only while privacy.participant_report is on (D-049)."""
+        own_report_enabled()
         pseudonym = await store().participant_by_token(_bearer(authorization))
         if pseudonym is None:
             raise HTTPException(403, "not authorised")

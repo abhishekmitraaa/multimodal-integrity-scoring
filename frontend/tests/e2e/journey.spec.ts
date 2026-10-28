@@ -1,6 +1,6 @@
 // The whole journey (D-036): three practice tasks build a baseline, the exam is checked against it,
-// the participant sees their report and adds a note, and a reviewer finds it on the dashboard and
-// records a decision (D-039). SYNTHETIC input.
+// the student leaves without a report (D-049), and a reviewer finds it on the dashboard and records
+// a decision (D-039). SYNTHETIC input.
 import { expect, test, type Page } from "@playwright/test";
 import { mod, REVIEWER_TOKEN } from "./helpers";
 
@@ -80,30 +80,11 @@ test("practice builds a baseline, the exam is checked, the report and dashboard 
   }, PASTED);
   await testAndSubmit(page, /tests passed/);
 
-  // The participant's own report.
-  await page.click("#see-report");
-  await expect(page.locator("#overall-verdict")).toContainText("Review recommended", { timeout: 60_000 });
-  await expect(page.locator('[data-finding="untyped"]')).toHaveClass(/finding-flag/);
-  await expect(page.locator('[data-finding="reconciliation"]')).toHaveClass(/finding-flag/);
-  await expect(page.locator("#baseline-status")).toContainText(/windows of typing/);
-  await expect(page.locator("#baseline-check")).toContainText(/Baseline check: (confirmed|does not match|could not run)/);
-  const ks = page.locator('[data-finding="keystroke"]');
-  await expect(page.locator(".ks-chart")).toHaveCount(0);              // participants never see distances or thresholds
-  await expect(page.locator("#process-features")).toHaveCount(0);      // nor the feature-by-feature process comparison
-  const modelRan = (await page.locator("#distances-redacted").count()) > 0;
-  if (modelRan) {
-    await expect(ks).toHaveClass(/finding-(ok|flag)/);                  // model installed: compared to the baseline
-  } else {
-    await expect(ks).toHaveClass(/finding-unavailable/);                // no model on this machine: said plainly
-  }
-
-  // The participant adds a note for the reviewer (D-039).
-  const review = page.locator(".review");
-  await expect(review.locator("#no-decision")).toBeVisible();
-  const note = "The pasted part is my own helper from an earlier assignment.";
-  await review.locator("textarea").fill(note);
-  await review.locator("button.primary").click();
-  await expect(review.locator(".appeal")).toContainText(note);
+  // D-049: after the exam the student just leaves; reports are for the reviewers.
+  await expect(page.locator("#done-exit")).toContainText("You can close this window");
+  await expect(page.locator("#see-report")).toHaveCount(0);
+  await page.goto("/#/my-report");
+  await expect(page.locator("#no-report")).toContainText("Reports are shown to the reviewers only");
 
   // The reviewer dashboard lists the participant and opens the same report.
   await page.goto("/#/dashboard");
@@ -115,13 +96,19 @@ test("practice builds a baseline, the exam is checked, the report and dashboard 
   await expect(row.locator(".decision-cell")).toHaveText("Not reviewed");
   await row.locator("button").click();
   await expect(page.locator("#overall-verdict")).toContainText("Review recommended", { timeout: 60_000 });
+  await expect(page.locator('[data-finding="untyped"]')).toHaveClass(/finding-flag/);
+  await expect(page.locator('[data-finding="reconciliation"]')).toHaveClass(/finding-flag/);
+  await expect(page.locator("#baseline-status")).toContainText(/windows of typing/);
+  const ks = page.locator('[data-finding="keystroke"]');
+  const modelRan = !((await ks.getAttribute("class")) ?? "").includes("finding-unavailable");   // no model on this machine: said plainly
   await expect(page.locator("#report a[href^='#/replay?session=']")).toHaveCount(1);
   await expect(page.locator(".ks-chart")).toHaveCount(modelRan ? 1 : 0);   // reviewers do see the distances
   await expect(page.locator('[data-finding="ast_jump"]')).toHaveClass(/finding-info/);   // AST evidence, never a flag (SPEC 6.3)
   await expect(page.locator('#process-features tr[data-feature="linearity"]')).toBeVisible();   // SPEC 6.2, reviewers only
 
-  // The reviewer reads the participant's note and records a decision with notes (D-039).
-  await expect(review.locator(".appeal")).toContainText(note);
+  // The reviewer records a decision with notes (D-039).
+  const review = page.locator(".review");
+  await expect(review.locator("#no-decision")).toBeVisible();
   await expect(review.locator(".chain")).toHaveClass(/chain-ok/);        // the decision panel shows the hash-chain check
   await expect(review.locator(".chain")).toContainText(/verified over \d+ events/);
   await review.locator("select").selectOption("inconclusive");
@@ -134,10 +121,4 @@ test("practice builds a baseline, the exam is checked, the report and dashboard 
   await expect(review.locator(".decision-current")).toContainText("Inconclusive");
   await expect(review.locator(".decision-current")).toContainText(notes);
   await expect(row.locator(".decision-cell")).toHaveText("Inconclusive");
-
-  // The participant sees the outcome and date, not the reviewer's notes.
-  await page.goto("/#/my-report");
-  await expect(review.locator(".decision-current")).toContainText("Inconclusive", { timeout: 60_000 });
-  await expect(review).not.toContainText(notes);
-  await expect(review).not.toContainText("reviewer-1");
 });

@@ -29,7 +29,7 @@ def upload(client: Any, sid: str, token: str, seq: int, data: bytes = FAKE) -> A
     return client.post(f"/api/sessions/{sid}/video?seq={seq}", content=data, headers={"Authorization": f"Bearer {token}"})
 
 
-def test_chunks_in_order_encrypted_and_admin_only(client: Any, settings: Any) -> None:
+def test_chunks_in_order_encrypted_and_staff_only(client: Any, settings: Any) -> None:
     p = participant(client)
     sid, tok = open_exam(client, p["participant_token"])
     assert upload(client, sid, tok, 0, FAKE + b"0").json() == {"chunks": 1}
@@ -45,7 +45,8 @@ def test_chunks_in_order_encrypted_and_admin_only(client: Any, settings: Any) ->
 
     r = client.get(f"/api/admin/sessions/{sid}/video", headers=ADMIN)
     assert r.status_code == 200 and r.headers["content-type"] == "video/webm" and r.content == FAKE + b"0" + FAKE + b"1"
-    assert client.get(f"/api/admin/sessions/{sid}/video", headers=REVIEWER).status_code == 403
+    assert client.get(f"/api/admin/sessions/{sid}/video", headers=REVIEWER).content == r.content    # reviewers too (D-049)
+    assert client.get(f"/api/admin/sessions/{sid}/video", headers={"Authorization": f"Bearer {p['participant_token']}"}).status_code == 403
     assert ("view_video", sid) in {(e["action"], e["target"]) for e in client.get("/api/access-log", headers=ADMIN).json()}
 
 
@@ -99,7 +100,16 @@ def test_reports_show_the_video_and_a_labelled_simulated_panel_to_staff_only(cli
     demo = staff["head_movement_demo"]
     assert demo["simulated"] is True and demo["label"] == SIMULATED_LABEL and demo["samples"]
     assert not any("head" in f["id"] for f in staff["findings"])                        # never a finding
-    own = client.get("/api/me/report", headers={"Authorization": f"Bearer {p['participant_token']}"}).json()["exams"][0]
+    me = {"Authorization": f"Bearer {p['participant_token']}"}
+    assert client.get("/api/me/report", headers=me).status_code == 404                  # D-049: students see no report
+
+
+def test_with_own_reports_on_students_still_never_see_the_video(own_report_client: Any) -> None:
+    c = own_report_client
+    p = participant(c)
+    sid = submit(c, p["participant_token"], "exam", "exam_run_length", pasted_exam)
+    c.portal.call(_index_chunk, c.app.state.store, sid)
+    own = c.get("/api/me/report", headers={"Authorization": f"Bearer {p['participant_token']}"}).json()["exams"][0]
     assert "video" not in own and "head_movement_demo" not in own
 
 
@@ -133,3 +143,13 @@ def test_simulated_head_movement_is_deterministic_and_bounded() -> None:
     assert simulated_head_movement("s-2", 300.0) != a
     long = simulated_head_movement("s-3", 7200.0)
     assert len(long["samples"]) <= 601 and all(x["end"] >= x["start"] for x in long["look_aways"])
+
+
+def test_students_get_no_report_and_no_notes_by_default(client: Any) -> None:
+    p = participant(client, video=False)
+    me = {"Authorization": f"Bearer {p['participant_token']}"}
+    sid = submit(client, p["participant_token"], "exam", "exam_run_length", pasted_exam)
+    assert client.get("/api/me/report", headers=me).status_code == 404
+    assert client.post("/api/me/appeals", json={"session_id": sid, "note": "Let me explain this."}, headers=me).status_code == 404
+    assert client.get("/api/client-config").json()["participant_report"] is False
+    assert client.get(f"/api/participants/{p['pseudonym']}/report", headers=REVIEWER).status_code == 200   # reviewers do

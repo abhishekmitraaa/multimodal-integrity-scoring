@@ -22,7 +22,7 @@ with development data. No real participant data exists yet: real collection wait
 | Practice tasks | Step 1 on the tasks page | The code to type is shown (D-035): this typing builds the student's personal baseline. |
 | Baseline check | Step 2 | One more typed task, held out, to confirm the baseline really describes this student. |
 | Exam | Step 3 | Type part of the solution, then **paste** a few lines from outside. Run the tests and submit. |
-| Own report | "See your report" | A plain verdict and findings, **no numbers** (so a student can't learn how close to the line they can go). The student can add a note for the reviewer. |
+| Submitted | the "Submitted" page | The student just leaves: "you can close this window". Reports are for the reviewers only (D-049). |
 
 ## 2. The reviewer's side (5 min)
 
@@ -55,7 +55,7 @@ Open `http://127.0.0.1:5173/?study=1#/` (a dev tester in the study protocol):
 Tick "Optional: record my webcam during the exam tasks" on the consent page. During the exam a small
 preview shows "● Recording webcam". On the dashboard, open that student's report:
 
-- "Load the video (admin)" plays the recording with the **admin** token; the reviewer token is refused.
+- "Load the video" plays the recording for reviewers and admins; every viewing is logged.
 - The **Head movement** panel is tagged **Video demonstration** ("Head and eye movement analysis modelling: in development, example output"): example numbers, not computed
   from the video, not used in any finding. Say so when you show it.
 - Real participants are never recorded (D-048); the video is not analysed.

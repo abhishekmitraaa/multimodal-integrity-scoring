@@ -92,3 +92,9 @@ def make_client(settings: Any) -> Iterator[Callable[..., Any]]:
 @pytest.fixture
 def client(make_client: Callable[..., Any]) -> Any:
     return make_client()
+
+
+@pytest.fixture
+def own_report_client(make_client: Callable[..., Any], settings: Any) -> Any:
+    """A client with privacy.participant_report on (D-049 turns it off by default)."""
+    return make_client(privacy={**settings.privacy, "participant_report": True})

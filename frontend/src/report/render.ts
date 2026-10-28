@@ -96,11 +96,11 @@ function habitsTable(base: HabitValues | null, exam: HabitValues | null): HTMLEl
   );
 }
 
-/** The webcam recording (D-048): loaded on request, with the admin token. Not analysed. */
+/** The webcam recording (D-048): loaded on request with the staff token (reviewers and admins, D-049). Not analysed. */
 function videoSection(ex: ExamReport, loadVideo?: (sessionId: string) => Promise<Blob>): HTMLElement | null {
   if (!ex.video?.available) return null;
   const holder = h("div", { class: "video-holder" });
-  const load = h("button", { id: `video-load-${ex.session_id.slice(0, 8)}` }, "Load the video (admin)");
+  const load = h("button", { id: `video-load-${ex.session_id.slice(0, 8)}` }, "Load the video");
   load.addEventListener("click", async () => {
     load.setAttribute("disabled", "");
     try {
@@ -115,8 +115,8 @@ function videoSection(ex: ExamReport, loadVideo?: (sessionId: string) => Promise
   });
   return h("section", { class: "video-section", "data-session": ex.session_id },
     h("h3", {}, "Webcam recording"),
-    h("p", { class: "muted" }, `About ${ex.video.approx_seconds} s, ${ex.video.chunks} part(s). A demo feature: the video is stored encrypted, `,
-      "only an admin can view it, every viewing is logged, and nothing analyses it."),
+    h("p", { class: "muted" }, `About ${ex.video.approx_seconds} s, ${ex.video.chunks} part(s). The video is stored encrypted; `,
+      "reviewers and admins can view it, and every viewing is logged."),
     loadVideo ? load : null, holder);
 }
 

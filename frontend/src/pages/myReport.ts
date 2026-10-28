@@ -49,7 +49,9 @@ export async function myReportPage(root: HTMLElement): Promise<void> {
         withdrawPanel(participant),
       );
     } catch (err) {
-      main.replaceChildren(h("p", { class: "error" }, String(err)));
+      main.replaceChildren(String(err).includes(": 404 ")
+        ? h("p", { id: "no-report" }, "Reports are shown to the reviewers only. You can close this window.")
+        : h("p", { class: "error" }, String(err)));
     }
   };
   await load();

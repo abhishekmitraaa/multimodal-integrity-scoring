@@ -45,16 +45,16 @@ def pasted_exam(gen: SyntheticTyping) -> list[dict[str, Any]]:
     return events + [gen.segment_end()]
 
 
-def test_participant_list_reports_and_access_log(client: Any) -> None:
-    p = client.post("/api/participants", json={"kind": "synthetic", "age_confirmed": True, "consent": CONSENT}).json()
-    submit(client, p["participant_token"], "practice", "practice_sum_evens",
+def test_participant_list_reports_and_access_log(own_report_client: Any) -> None:
+    p = own_report_client.post("/api/participants", json={"kind": "synthetic", "age_confirmed": True, "consent": CONSENT}).json()
+    submit(own_report_client, p["participant_token"], "practice", "practice_sum_evens",
            lambda g: g.segment_start() + g.type_text("def sum_evens(xs): return 0") + [g.segment_end()])
-    exam = submit(client, p["participant_token"], "exam", "exam_run_length", pasted_exam)
+    exam = submit(own_report_client, p["participant_token"], "exam", "exam_run_length", pasted_exam)
 
-    listed = {x["pseudonym"]: x for x in client.get("/api/participants", headers=REVIEWER).json()}
+    listed = {x["pseudonym"]: x for x in own_report_client.get("/api/participants", headers=REVIEWER).json()}
     assert [s["kind"] for s in listed[p["pseudonym"]]["sessions"]] == ["practice", "exam"]
 
-    report = client.get(f"/api/participants/{p['pseudonym']}/report", headers=REVIEWER).json()
+    report = own_report_client.get(f"/api/participants/{p['pseudonym']}/report", headers=REVIEWER).json()
     assert report["model"]["available"] is False
     assert report["baseline"]["status"] == "insufficient"
     [ex] = report["exams"]
@@ -64,29 +64,29 @@ def test_participant_list_reports_and_access_log(client: Any) -> None:
     assert next(f for f in ex["findings"] if f["id"] == "keystroke")["status"] == "unavailable"
     assert report["overall"]["state"] == "review" and report["false_flag_note"]
 
-    own = client.get("/api/me/report", headers={"Authorization": f"Bearer {p['participant_token']}"}).json()
+    own = own_report_client.get("/api/me/report", headers={"Authorization": f"Bearer {p['participant_token']}"}).json()
     assert own["pseudonym"] == p["pseudonym"] and own["exams"][0]["state"] == "review"
 
-    actions = {(e["action"], e["target"]) for e in client.get("/api/access-log", headers=ADMIN).json()}
+    actions = {(e["action"], e["target"]) for e in own_report_client.get("/api/access-log", headers=ADMIN).json()}
     assert ("read_report", p["pseudonym"]) in actions and ("read_own_report", p["pseudonym"]) in actions
 
 
-def test_report_access_is_refused_without_the_right_token(client: Any) -> None:
-    assert client.get("/api/participants", headers={"Authorization": "Bearer nope"}).status_code == 403
-    assert client.get("/api/me/report", headers={"Authorization": "Bearer nope"}).status_code == 403
-    assert client.get("/api/participants/SYN-NOBODY00/report", headers=REVIEWER).status_code == 404
+def test_report_access_is_refused_without_the_right_token(own_report_client: Any) -> None:
+    assert own_report_client.get("/api/participants", headers={"Authorization": "Bearer nope"}).status_code == 403
+    assert own_report_client.get("/api/me/report", headers={"Authorization": "Bearer nope"}).status_code == 403
+    assert own_report_client.get("/api/participants/SYN-NOBODY00/report", headers=REVIEWER).status_code == 404
 
 
-def test_participant_sees_only_submitted_sessions_and_no_server_details(client: Any) -> None:
-    p = client.post("/api/participants", json={"kind": "synthetic", "age_confirmed": True, "consent": CONSENT}).json()
-    submit(client, p["participant_token"], "practice", "practice_sum_evens",
+def test_participant_sees_only_submitted_sessions_and_no_server_details(own_report_client: Any) -> None:
+    p = own_report_client.post("/api/participants", json={"kind": "synthetic", "age_confirmed": True, "consent": CONSENT}).json()
+    submit(own_report_client, p["participant_token"], "practice", "practice_sum_evens",
            lambda g: g.segment_start() + g.type_text("def f(): pass") + [g.segment_end()])
-    r = client.post("/api/sessions", json={"participant_token": p["participant_token"], "kind": "exam", "problem_id": "exam_run_length"})
+    r = own_report_client.post("/api/sessions", json={"participant_token": p["participant_token"], "kind": "exam", "problem_id": "exam_run_length"})
     open_exam = r.json()["session_id"]                         # started, not submitted
-    own = client.get("/api/me/report", headers={"Authorization": f"Bearer {p['participant_token']}"}).json()
+    own = own_report_client.get("/api/me/report", headers={"Authorization": f"Bearer {p['participant_token']}"}).json()
     assert own["exams"] == [] and own["overall"]["state"] == "no_exam_yet"
     assert "\\" not in own["model"]["note"] and "/" not in own["model"]["note"]      # no server path
-    staff = client.get(f"/api/participants/{p['pseudonym']}/report", headers=REVIEWER).json()
+    staff = own_report_client.get(f"/api/participants/{p['pseudonym']}/report", headers=REVIEWER).json()
     assert [e["session_id"] for e in staff["exams"]] == [open_exam]                 # reviewers see it, marked open
     assert staff["exams"][0]["closed"] is False
 
@@ -101,10 +101,10 @@ def test_server_decides_kind_and_allows_one_check(client: Any) -> None:
     assert again.status_code == 409
 
 
-def test_participant_report_has_no_distances_or_thresholds(client: Any) -> None:
-    p = client.post("/api/participants", json={"kind": "synthetic", "age_confirmed": True, "consent": CONSENT}).json()
-    submit(client, p["participant_token"], "exam", "exam_run_length", pasted_exam)
-    own = client.get("/api/me/report", headers={"Authorization": f"Bearer {p['participant_token']}"}).json()
+def test_participant_report_has_no_distances_or_thresholds(own_report_client: Any) -> None:
+    p = own_report_client.post("/api/participants", json={"kind": "synthetic", "age_confirmed": True, "consent": CONSENT}).json()
+    submit(own_report_client, p["participant_token"], "exam", "exam_run_length", pasted_exam)
+    own = own_report_client.get("/api/me/report", headers={"Authorization": f"Bearer {p['participant_token']}"}).json()
     for key in ("windows", "population_threshold", "personal_threshold", "share_above", "threshold"):
         assert key not in own["baseline"]["check"]
         assert key not in own["exams"][0]["keystroke"]

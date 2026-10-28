@@ -99,24 +99,24 @@ def test_client_config_carries_the_notice_fields(make_client: Any) -> None:
     assert notice["contact"] == SET["contact"] and "2027-07-29" in notice["retention"]
 
 
-def test_withdrawal_erases_everything_and_the_token_stops_working(client: Any, db_url: str) -> None:
+def test_withdrawal_erases_everything_and_the_token_stops_working(own_report_client: Any, db_url: str) -> None:
     from test_api_reviews import raw
 
-    p = client.post("/api/participants", json={"kind": "synthetic", "age_confirmed": True, "consent": CONSENT}).json()
+    p = own_report_client.post("/api/participants", json={"kind": "synthetic", "age_confirmed": True, "consent": CONSENT}).json()
     auth = {"Authorization": f"Bearer {p['participant_token']}"}
-    exam = submit(client, p["participant_token"], "exam", "exam_run_length", pasted_exam)
-    client.post("/api/me/appeals", json={"session_id": exam, "note": "Please read my explanation."}, headers=auth)
-    client.post(f"/api/sessions/{exam}/decision", json={"decision": "inconclusive", "notes": "Asked the student."}, headers=REVIEWER)
+    exam = submit(own_report_client, p["participant_token"], "exam", "exam_run_length", pasted_exam)
+    own_report_client.post("/api/me/appeals", json={"session_id": exam, "note": "Please read my explanation."}, headers=auth)
+    own_report_client.post(f"/api/sessions/{exam}/decision", json={"decision": "inconclusive", "notes": "Asked the student."}, headers=REVIEWER)
 
-    assert client.post("/api/me/withdraw").status_code == 401
-    r = client.post("/api/me/withdraw", headers=auth)
+    assert own_report_client.post("/api/me/withdraw").status_code == 401
+    r = own_report_client.post("/api/me/withdraw", headers=auth)
     assert r.status_code == 200 and r.json()["n_sessions"] == 1
-    assert client.get("/api/me/report", headers=auth).status_code == 403
-    assert client.post("/api/me/withdraw", headers=auth).status_code == 403
-    assert client.get(f"/api/participants/{p['pseudonym']}/report", headers=REVIEWER).status_code == 404
+    assert own_report_client.get("/api/me/report", headers=auth).status_code == 403
+    assert own_report_client.post("/api/me/withdraw", headers=auth).status_code == 403
+    assert own_report_client.get(f"/api/participants/{p['pseudonym']}/report", headers=REVIEWER).status_code == 404
     for table in ("sessions", "events", "review_decisions", "appeals"):
         assert raw(db_url, f"SELECT count(*) AS n FROM {table} WHERE session_id = '{exam}'")[0]["n"] == 0
-    log = client.get("/api/access-log", headers=ADMIN).json()
+    log = own_report_client.get("/api/access-log", headers=ADMIN).json()
     assert any(e["action"] == "withdraw_and_erase" for e in log)
     # Earlier entries naming the participant or their exam are redacted, not left behind (migration 0003).
     assert not any(x in (e["target"], e["actor"]) for e in log for x in (p["pseudonym"], exam))
