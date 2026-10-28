@@ -179,16 +179,20 @@ def train(
     log: Callable[[int, float], None] | None = None,
     checkpoint: Path | None = None,
     checkpoint_every: int = 10,
+    init_state: Mapping[str, Any] | None = None,
 ) -> tuple[TypeNetEncoder, list[float]]:
     """Fixed number of epochs of random-triplet batches; returns the final model (no selection).
 
     With `checkpoint`, state (model, optimiser, loss history and every RNG) is saved every
     `checkpoint_every` epochs and training resumes from it, so a resumed run equals an
-    uninterrupted one.
+    uninterrupted one. With `init_state` (a state_dict), training starts from those weights:
+    fine-tuning the P2 encoder on study users (SPEC 12.3, step 1).
     """
     seed_everything(seed)
     rng = np.random.default_rng(seed)
     model = TypeNetEncoder(cfg).to(device)
+    if init_state is not None:
+        model.load_state_dict(init_state)
     opt = torch.optim.Adam(model.parameters(), lr=cfg.learning_rate, betas=cfg.adam_betas, eps=cfg.adam_eps)
     history: list[float] = []
     if checkpoint is not None and checkpoint.exists():

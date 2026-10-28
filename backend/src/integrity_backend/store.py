@@ -162,6 +162,34 @@ class Store:
                                     {"s": session_id, "t": onset_client_us})).rowcount
         return n == 1
 
+    async def study_export(self, kinds: Sequence[str], only: Sequence[str] | None = None) -> list[dict[str, Any]]:
+        """Study participants of these kinds with their submitted sessions: events (decrypted), study label and
+        browser covariates (D-047 export). Withdrawn participants are already erased."""
+        async with self.engine.connect() as conn:
+            people = (await conn.execute(text("SELECT pseudonym, kind FROM participants WHERE study_protocol AND kind = ANY(:k) "
+                                              "AND withdrawn_at IS NULL ORDER BY pseudonym"), {"k": list(kinds)})).all()
+            if only is not None:
+                people = [r for r in people if r.pseudonym in set(only)]
+            rows = (await conn.execute(text(
+                "SELECT s.session_id, s.pseudonym, s.kind, s.problem_id, s.created_at, s.browser_brand, s.browser_version, "
+                "s.cross_origin_isolated, l.condition, l.scripted, l.onset_client_us FROM sessions s "
+                "LEFT JOIN study_labels l ON l.session_id = s.session_id "
+                "WHERE s.pseudonym = ANY(:p) AND s.closed_at IS NOT NULL ORDER BY s.pseudonym, s.created_at"),
+                {"p": [r.pseudonym for r in people]})).all()
+        out = []
+        kind_of = {r.pseudonym: r.kind for r in people}
+        for r in rows:
+            _, links = await self.load_links(str(r.session_id))
+            out.append({
+                "pseudonym": r.pseudonym, "participant_kind": kind_of[r.pseudonym], "session_id": str(r.session_id),
+                "kind": r.kind, "problem_id": r.problem_id, "created_at": r.created_at.isoformat(),
+                "condition": r.condition, "scripted": bool(r.scripted) if r.condition else None,
+                "onset_client_us": r.onset_client_us,
+                "browser": {"brand": r.browser_brand, "version": r.browser_version, "cross_origin_isolated": r.cross_origin_isolated},
+                "events": [{"type": lk.record.type, "t_client_us": lk.record.t_client_us, "data": lk.record.data} for lk in links],
+            })
+        return out
+
     async def assign_condition(self, pseudonym: str, slot: int, condition: str) -> bool:
         """Researcher override of a slot (A8: a genuine task on another keyboard), only before it is started."""
         async with self.engine.begin() as conn:

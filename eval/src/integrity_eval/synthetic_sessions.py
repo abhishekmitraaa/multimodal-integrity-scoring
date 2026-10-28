@@ -29,10 +29,12 @@ from __future__ import annotations
 import hashlib
 import math
 import zlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
+
+from .fusion_eval import Session
 
 ATTACKS = ("A1", "A2", "A3a", "A3b", "A4", "IMP")
 GENUINE_CONDITIONS = ("genuine", "A8")
@@ -152,16 +154,6 @@ def other_keyboard(u: Typist, rng: np.random.Generator, cfg: dict[str, Any]) -> 
     return Typist(u.uid + "-kb2", u.flight_ms * float(rng.uniform(*cfg["a8_speed_factor"])),
                   u.hold_ms * float(rng.uniform(*cfg["a8_hold_factor"])), u.flight_log_sd, u.hold_log_sd,
                   u.pair_log_sd, u.pause_p, u.typo_p)
-
-
-@dataclass
-class Session:
-    uid: str
-    kind: str                 # practice | exam
-    label: str                # practice | genuine | A1 | A3b | A4
-    problem_id: str
-    events: list[dict[str, Any]] = field(default_factory=list)
-    onset_s: float | None = None          # attack onset (client seconds); None = no attack
 
 
 class _Writer:
@@ -297,4 +289,6 @@ def generate(users: int, practice_texts: dict[str, str], exam_text: str, cfg: di
             start = w.t
             w.type_text(typist, exam_text)
             sessions.append(Session(u.uid, "exam", label, "exam", w.finish(), onset_s=start))
+    for s in sessions:                                             # a covariate for the false-flag table (SPEC 12.4)
+        s.covariates["keyboard"] = "other keyboard" if s.label == "A8" else "usual keyboard"
     return typists, sessions

@@ -20,6 +20,11 @@ keystroke_encoder:
   max_epochs: 200                # TypeNet §4.4; no early stopping
   batches_per_epoch: 150         # TypeNet §4.4
   pretrain_dataset: aalto_desktop   # blocked on licence confirmation
+finetune:                        # SPEC 12.3 step 1: the P2 encoder fine-tuned per outer fold on training users' practice windows
+  epochs: 10                     # [PROPOSED] small: D2 has ~50 users x ~6 windows
+  learning_rate: 0.0005          # [PROPOSED] 10x below the P2 rate (D-032) so the pretrained encoder is adjusted, not overwritten
+  batches_per_epoch: 20
+  batch_size: 64
 reproduction:                    # P2 TypeNet reproduction on D1 (docs/p2_protocol.md)
   train_subjects: 68000          # TypeNet §4.4, "the first 68,000 subjects"
   test_subjects_k: 1000          # TypeNet §6.1, Table 2

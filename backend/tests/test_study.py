@@ -178,3 +178,15 @@ def test_scripted_sessions_timing_and_a8_assignment(client: Any, db_url: str) ->
     for table in ("study_assignments", "study_labels"):
         assert raw(db_url, f"SELECT count(*) AS n FROM {table} WHERE {'pseudonym' if table == 'study_assignments' else 'session_id'} = "
                            f"'{p['pseudonym'] if table == 'study_assignments' else sid}'")[0]["n"] == 0
+
+
+def test_study_export_carries_labels_browser_and_events(client: Any) -> None:
+    p = study_participant(client)
+    submit(client, p["participant_token"], "practice", "practice_sum_evens", typed, env=FIREFOX)
+    slot = client.get("/api/me/plan", headers=bearer(p["participant_token"])).json()["slots"][0]
+    sid = submit(client, p["participant_token"], "exam", slot["problem_id"], pasted_exam, env=FIREFOX)
+    rows = client.portal.call(client.app.state.store.study_export, ["dev"], [p["pseudonym"]])
+    mine = {r["session_id"]: r for r in rows if r["pseudonym"] == p["pseudonym"]}
+    assert len(mine) == 2 and mine[sid]["condition"] == slot["condition"] and mine[sid]["browser"]["brand"] == "firefox"
+    assert mine[sid]["events"] and all(r["participant_kind"] == "dev" for r in mine.values())
+    assert client.portal.call(client.app.state.store.study_export, ["real"], [p["pseudonym"]]) == []   # a dev tester is not D2
