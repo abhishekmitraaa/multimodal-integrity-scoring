@@ -224,20 +224,34 @@ class Store:
         """Stores chunk `index` (they arrive in order; a resent chunk is accepted once). Returns the chunks stored."""
         if self.video is None:
             raise VideoError("video_not_configured")
-        async with self.engine.begin() as conn:
-            await conn.execute(text("SELECT 1 FROM sessions WHERE session_id = CAST(:s AS uuid) FOR UPDATE"), {"s": session_id})
-            row = (await conn.execute(text("SELECT count(*) AS n, coalesce(sum(size), 0) AS b FROM session_videos "
-                                           "WHERE session_id = CAST(:s AS uuid)"), {"s": session_id})).one()
-            if index < row.n:                                  # a resend of a stored chunk: nothing to do
-                return int(row.n)
-            if index != row.n:
-                raise VideoError("out_of_order")
-            if row.b + len(data) > max_session_bytes:
-                raise VideoError("session_limit")
-            self.video.write(session_id, index, data)
-            await conn.execute(text("INSERT INTO session_videos (session_id, chunk_index, size, sha256) "
-                                    "VALUES (CAST(:s AS uuid), :i, :n, :h)"),
-                               {"s": session_id, "i": index, "n": len(data), "h": hashlib.sha256(data).digest()})
+        written = False
+        try:
+            async with self.engine.begin() as conn:
+                # The session row is locked and re-checked here: an erasure (which deletes it) either ran first,
+                # so nothing is written, or waits for this transaction and then deletes the file with the rows.
+                session = (await conn.execute(text("SELECT closed_at FROM sessions WHERE session_id = CAST(:s AS uuid) FOR UPDATE"),
+                                              {"s": session_id})).first()
+                if session is None:
+                    raise VideoError("unknown_session")
+                if session.closed_at is not None:
+                    raise VideoError("session_closed")
+                row = (await conn.execute(text("SELECT count(*) AS n, coalesce(sum(size), 0) AS b FROM session_videos "
+                                               "WHERE session_id = CAST(:s AS uuid)"), {"s": session_id})).one()
+                if index < row.n:                              # a resend of a stored chunk: nothing to do
+                    return int(row.n)
+                if index != row.n:
+                    raise VideoError("out_of_order")
+                if row.b + len(data) > max_session_bytes:
+                    raise VideoError("session_limit")
+                await conn.execute(text("INSERT INTO session_videos (session_id, chunk_index, size, sha256) "
+                                        "VALUES (CAST(:s AS uuid), :i, :n, :h)"),
+                                   {"s": session_id, "i": index, "n": len(data), "h": hashlib.sha256(data).digest()})
+                self.video.write(session_id, index, data)      # last step before commit
+                written = True
+        except BaseException:
+            if written:                                        # the commit failed: no file without its row
+                self.video.remove(session_id, index)
+            raise
         return index + 1
 
     async def video_info(self, session_ids: Sequence[str]) -> dict[str, dict[str, int]]:

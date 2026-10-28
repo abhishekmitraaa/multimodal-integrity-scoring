@@ -371,9 +371,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(403, "the participant did not agree to video")
         if seq < 0:
             raise HTTPException(400, "bad chunk number")
-        data = await request.body()
-        if not data or len(data) > int(vcfg.get("max_chunk_bytes", 8_000_000)):
-            raise HTTPException(413, "chunk too large or empty")
+        limit = int(vcfg.get("max_chunk_bytes", 8_000_000))
+        declared = request.headers.get("content-length")
+        if declared is not None and (not declared.isdigit() or int(declared) > limit):
+            raise HTTPException(413, "chunk too large")
+        parts, size = [], 0
+        async for part in request.stream():                   # read in pieces; stop as soon as the limit is passed
+            size += len(part)
+            if size > limit:
+                raise HTTPException(413, "chunk too large")
+            parts.append(part)
+        data = b"".join(parts)
+        if not data:
+            raise HTTPException(413, "empty chunk")
         try:
             stored = await store().add_video_chunk(session.session_id, seq, data, int(vcfg.get("max_session_bytes", 400_000_000)))
         except VideoError as exc:

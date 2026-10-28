@@ -47,6 +47,9 @@ class VideoFiles:
     def read(self, session_id: str, chunks: int) -> bytes:
         return b"".join(self.cipher.decrypt(self._path(session_id, i).read_bytes(), self._aad(session_id, i)) for i in range(chunks))
 
+    def remove(self, session_id: str, index: int) -> None:
+        self._path(session_id, index).unlink(missing_ok=True)
+
     def delete(self, session_ids: Iterable[str]) -> None:
         for sid in session_ids:
             shutil.rmtree(self.root / sid, ignore_errors=True)

@@ -78,11 +78,22 @@ def test_real_participants_need_explicit_approval_for_video() -> None:
         governance.validate(privacy)
 
 
+async def _index_chunk(store: Any, sid: str) -> None:
+    from sqlalchemy import text
+
+    async with store.engine.begin() as conn:
+        await conn.execute(text("INSERT INTO session_videos (session_id, chunk_index, size, sha256) VALUES (CAST(:s AS uuid), 0, :n, :h)"),
+                           {"s": sid, "n": len(FAKE), "h": b"x" * 32})
+    store.video.write(sid, 0, FAKE)
+
+
 def test_reports_show_the_video_and_a_labelled_simulated_panel_to_staff_only(client: Any) -> None:
     p = participant(client)
     sid = submit(client, p["participant_token"], "exam", "exam_run_length", pasted_exam)
-    # the session is closed by submit(); add the video through the store, as if it had arrived during the exam
-    client.portal.call(client.app.state.store.add_video_chunk, sid, 0, FAKE, 10**9)
+    # submit() closes the session, so the chunk goes in the way it would have arrived during the exam:
+    # the index row and the file, written directly for the test
+    store = client.app.state.store
+    client.portal.call(_index_chunk, store, sid)
     staff = client.get(f"/api/participants/{p['pseudonym']}/report", headers=REVIEWER).json()["exams"][0]
     assert staff["video"]["available"] and staff["video"]["chunks"] == 1
     demo = staff["head_movement_demo"]
@@ -90,6 +101,20 @@ def test_reports_show_the_video_and_a_labelled_simulated_panel_to_staff_only(cli
     assert not any("head" in f["id"] for f in staff["findings"])                        # never a finding
     own = client.get("/api/me/report", headers={"Authorization": f"Bearer {p['participant_token']}"}).json()["exams"][0]
     assert "video" not in own and "head_movement_demo" not in own
+
+
+def test_store_refuses_chunks_for_closed_or_erased_sessions_and_leaves_no_file(client: Any, settings: Any) -> None:
+    from integrity_backend.store import VideoError
+
+    store = client.app.state.store
+    p = participant(client)
+    sid, tok = open_exam(client, p["participant_token"])
+    client.post(f"/api/sessions/{sid}/close", headers={"Authorization": f"Bearer {tok}"})
+    with pytest.raises(VideoError, match="session_closed"):
+        client.portal.call(store.add_video_chunk, sid, 0, FAKE, 10**9)
+    with pytest.raises(VideoError, match="unknown_session"):
+        client.portal.call(store.add_video_chunk, "00000000-0000-0000-0000-000000000000", 0, FAKE, 10**9)
+    assert not (Path(settings.data_root) / "video" / sid).exists()
 
 
 def test_withdrawal_deletes_the_video_files(client: Any, settings: Any) -> None:
