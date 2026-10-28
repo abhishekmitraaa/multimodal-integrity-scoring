@@ -20,7 +20,7 @@ from typing import Any, Iterable
 
 from .crypto import FieldCipher
 
-SIMULATED_LABEL = "Example output of the planned head-movement analysis; the video is not analysed yet"
+SIMULATED_LABEL = "Head and eye movement analysis modelling: in development, example output"
 
 
 class VideoFiles:

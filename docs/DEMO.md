@@ -56,7 +56,7 @@ Tick "Optional: record my webcam during the exam tasks" on the consent page. Dur
 preview shows "● Recording webcam". On the dashboard, open that student's report:
 
 - "Load the video (admin)" plays the recording with the **admin** token; the reviewer token is refused.
-- The **Head movement** panel is tagged **Video demonstration** ("example output; the video is not analysed yet"): example numbers, not computed
+- The **Head movement** panel is tagged **Video demonstration** ("Head and eye movement analysis modelling: in development, example output"): example numbers, not computed
   from the video, not used in any finding. Say so when you show it.
 - Real participants are never recorded (D-048); the video is not analysed.
 

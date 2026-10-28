@@ -38,7 +38,7 @@ test("the webcam records during the exam and an admin can play it back", async (
   await page.locator(".video-section button").click();
   await expect(page.locator(".video-section .error")).toHaveText("Viewing the video needs the admin token.");
   await expect(page.locator("#head-demo .demo-tag")).toHaveText("Video demonstration");
-  await expect(page.locator("#head-demo")).toContainText("the video is not analysed yet");
+  await expect(page.locator("#head-demo")).toContainText("Head and eye movement analysis modelling: in development, example output");
 
   await page.fill("#dash-token", ADMIN_TOKEN);
   await page.click("#dash-load");
