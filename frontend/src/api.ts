@@ -52,7 +52,7 @@ async function call<T>(path: string, init: RequestInit = {}, token?: string): Pr
 
 export const api = {
   health: () => call<{ status: string }>("/api/health"),
-  clientConfig: () => call<{ policy: EditorPolicy; capture: CaptureSettings; notice: NoticeFields }>("/api/client-config"),
+  clientConfig: () => call<{ policy: EditorPolicy; capture: CaptureSettings; notice: NoticeFields; video: { kinds: string[]; chunk_ms: number } }>("/api/client-config"),
   problem: (id: string) => call<Problem>(`/api/problems/${id}`),
   createParticipant: (body: unknown) =>
     call<{ pseudonym: string; participant_token: string }>("/api/participants", { method: "POST", body: JSON.stringify(body) }),
@@ -83,6 +83,13 @@ export const api = {
         `/api/sessions/${sessionId}/decision`, { method: "POST", body: JSON.stringify({ decision, notes }) }, token,
       ),
     accessLog: (token: string) => call<AccessLogEntry[]>("/api/access-log", {}, token),
+    /** The session's webcam recording (D-048); admin token only. */
+    video: async (sessionId: string, token: string): Promise<Blob> => {
+      const res = await fetch(`/api/admin/sessions/${sessionId}/video`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.status === 403) throw new Error("Viewing the video needs the admin token.");
+      if (!res.ok) throw new Error(`video: ${res.status}`);
+      return res.blob();
+    },
     events: (id: string, token: string) => call<{ events: StaffEvent[] }>(`/api/sessions/${id}/events`, {}, token),
     verify: (id: string, token: string) =>
       call<{ ok: boolean; n_events: number; head_hash: string; first_bad_index: number | null; reason: string | null }>(
@@ -166,6 +173,20 @@ export interface ExamReport {
   process?: { exam: Record<string, number | null>; baseline: Record<string, number | null> | null };
   decisions?: Decision[];
   appeals?: Appeal[];
+  /** D-048, staff only: the webcam recording (a demo feature, not analysed). */
+  video?: { available: boolean; chunks: number; bytes: number; approx_seconds: number };
+  /** D-048, staff only: SIMULATED for the demo, never computed from the video. */
+  head_movement_demo?: HeadMovementDemo;
+}
+
+export interface HeadMovementDemo {
+  simulated: true;
+  label: string;
+  step_s: number;
+  samples: Array<{ t: number; yaw: number }>;
+  look_aways: Array<{ start: number; end: number; direction: "left" | "right" }>;
+  facing_screen_share: number;
+  longest_look_away_s: number;
 }
 
 // ---- reviewer workflow (D-039)

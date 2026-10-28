@@ -26,6 +26,13 @@ signing:                         # deferred (D-017)
   algorithm: ed25519
   key_file: chain_signing_key.pem
 access_log: true
+video:                           # D-048: webcam recording during exam tasks, a DEMO feature (lead's request, 2026-10-28)
+  kinds: [dev, synthetic]        # never real participants: adding real needs ethics approval that covers video AND ethics_approved_for_video
+  ethics_approved_for_video: false
+  chunk_ms: 5000                 # the browser sends one chunk every 5 s
+  max_chunk_bytes: 8000000
+  max_session_bytes: 400000000   # about an hour of webcam video (no audio)
+  demo_head_movement: true       # a SIMULATED head-movement panel for dev/synthetic sessions with video; never computed from the video, never used in findings
 staff:                           # D-044: named accounts via scripts/staff_accounts.py
   shared_reviewer_token: true    # development and tests only; real collection requires false (decisions must name a person)
 roles: [participant, reviewer, researcher, admin]

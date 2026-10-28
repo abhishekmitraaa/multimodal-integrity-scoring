@@ -49,6 +49,9 @@ def validate(privacy: Mapping[str, Any]) -> None:
     if privacy.get("real_collection_enabled") and missing(privacy):
         raise GovernanceError("real_collection_enabled needs every governance value in config/privacy.yaml; "
                               f"missing: {', '.join(missing(privacy))}")
+    video = privacy.get("video") or {}
+    if "real" in video.get("kinds", []) and not video.get("ethics_approved_for_video"):
+        raise GovernanceError("video.kinds includes real participants, but video.ethics_approved_for_video is false (D-048)")
     if privacy.get("real_collection_enabled") and (privacy.get("staff") or {}).get("shared_reviewer_token", False):
         raise GovernanceError("real_collection_enabled needs staff.shared_reviewer_token: false, so every "
                               "decision names a person (D-044); create accounts with scripts/staff_accounts.py")

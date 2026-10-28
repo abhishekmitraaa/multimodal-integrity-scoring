@@ -839,7 +839,8 @@ reviewer as its own queue.
 
 ### 9.5 Out of scope for v1
 
-- Webcam or second-device detection.
+- Webcam or second-device detection. (D-048 adds webcam *recording* as a demo feature for test accounts
+  only: viewable by admins, not analysed; its head-movement panel is simulated.)
 - VM or remote-desktop detection.
 - Browser lockdown.
 - Hardware keystroke injectors (treated as A2/A3).

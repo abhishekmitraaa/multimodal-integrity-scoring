@@ -50,6 +50,16 @@ Open `http://127.0.0.1:5173/?study=1#/` (a dev tester in the study protocol):
   solution in its own tab. Reviewers never see the conditions.
 - Real participants also get the sitting rules: the same browser in both sittings, a day between them.
 
+## 3b. Webcam recording (demo feature, 1 min)
+
+Tick "Optional: record my webcam during the exam tasks" on the consent page. During the exam a small
+preview shows "● Recording webcam". On the dashboard, open that student's report:
+
+- "Load the video (admin)" plays the recording with the **admin** token; the reviewer token is refused.
+- The **Head movement (demo)** panel is marked **SIMULATED**: random numbers for the demo, not computed
+  from the video, not used in any finding. Say so when you show it.
+- Real participants are never recorded (D-048); the video is not analysed.
+
 ## 4. Withdrawal (1 min)
 
 "Withdraw from the study" at the bottom of the tasks page: two clicks, everything deleted, the access

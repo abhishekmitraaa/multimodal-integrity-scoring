@@ -2,7 +2,7 @@
 // It shows evidence with plain verdicts. There is no single integrity score: that needs a fusion
 // model fitted on labelled study data (P3, after data collection).
 
-import type { DecisionKind, ExamReport, Finding, HabitValues, Report, ReportState } from "../api";
+import type { DecisionKind, ExamReport, Finding, HabitValues, HeadMovementDemo, Report, ReportState } from "../api";
 import { h } from "../dom";
 
 const STATE_TEXT: Record<ReportState, [string, string]> = {
@@ -96,6 +96,55 @@ function habitsTable(base: HabitValues | null, exam: HabitValues | null): HTMLEl
   );
 }
 
+/** The webcam recording (D-048): loaded on request, with the admin token. Not analysed. */
+function videoSection(ex: ExamReport, loadVideo?: (sessionId: string) => Promise<Blob>): HTMLElement | null {
+  if (!ex.video?.available) return null;
+  const holder = h("div", { class: "video-holder" });
+  const load = h("button", { id: `video-load-${ex.session_id.slice(0, 8)}` }, "Load the video (admin)");
+  load.addEventListener("click", async () => {
+    load.setAttribute("disabled", "");
+    try {
+      const blob = await loadVideo!(ex.session_id);
+      const player = h("video", { controls: true, class: "webcam-player", id: `video-${ex.session_id.slice(0, 8)}` }) as HTMLVideoElement;
+      player.src = URL.createObjectURL(blob);
+      holder.replaceChildren(player);
+    } catch (err) {
+      load.removeAttribute("disabled");
+      holder.replaceChildren(h("p", { class: "error" }, String(err).replace(/^Error: /, "")));
+    }
+  });
+  return h("section", { class: "video-section", "data-session": ex.session_id },
+    h("h3", {}, "Webcam recording"),
+    h("p", { class: "muted" }, `About ${ex.video.approx_seconds} s, ${ex.video.chunks} part(s). A demo feature: the video is stored encrypted, `,
+      "only an admin can view it, every viewing is logged, and nothing analyses it."),
+    loadVideo ? load : null, holder);
+}
+
+/** The head-movement panel (D-048): SIMULATED numbers for the demo, said on the panel itself. */
+function headDemoPanel(d: HeadMovementDemo | undefined): HTMLElement | null {
+  if (!d) return null;
+  const W = 640, H = 160, L = 40, T = 10, B = 24;
+  const tMax = Math.max(1, ...d.samples.map((s) => s.t));
+  const x = (t: number) => L + (t / tMax) * (W - L - 8);
+  const y = (yaw: number) => T + (1 - (Math.max(-70, Math.min(70, yaw)) + 70) / 140) * (H - T - B);
+  const chart = svg("svg", { viewBox: `0 0 ${W} ${H}`, class: "head-chart", role: "img", "aria-label": "Simulated head turn over time" });
+  chart.append(svg("rect", { x: L, y: y(30), width: W - L - 8, height: y(-30) - y(30), class: "head-band" }));
+  chart.append(svg("polyline", { points: d.samples.map((s) => `${x(s.t)},${y(s.yaw)}`).join(" "), class: "head-line" }));
+  chart.append(svg("text", { x: 4, y: y(0) + 4, class: "tick" }, "0°"));
+  chart.append(svg("text", { x: 4, y: y(45) + 4, class: "tick" }, "R"));
+  chart.append(svg("text", { x: 4, y: y(-45) + 4, class: "tick" }, "L"));
+  return h("section", { class: "head-demo", id: "head-demo" },
+    h("p", { class: "simulated-badge" }, "SIMULATED"),
+    h("h3", {}, "Head movement (demo)"),
+    h("p", { class: "simulated-label" }, d.label),
+    h("figure", { class: "chart-figure" }, chart,
+      h("figcaption", { class: "muted" }, "Simulated head turn left/right over the exam; the shaded band is facing the screen (within 30°).")),
+    h("ul", {},
+      h("li", {}, `Facing the screen: ${Math.round(d.facing_screen_share * 100)}% of the time (simulated)`),
+      h("li", {}, `Looks away: ${d.look_aways.length}, longest ${d.longest_look_away_s} s (simulated)`)),
+  );
+}
+
 /** Reviewer decisions (the last one is current) and the participant's appeals (D-039). */
 function reviewSection(ex: ExamReport, extra: Node | null): HTMLElement | null {
   const decisions = ex.decisions ?? [];
@@ -150,7 +199,8 @@ function processTable(p: NonNullable<ExamReport["process"]>): HTMLElement {
   );
 }
 
-function examSection(ex: ExamReport, replayLink?: (sessionId: string) => string, reviewExtra?: (ex: ExamReport) => Node | null): HTMLElement {
+function examSection(ex: ExamReport, replayLink?: (sessionId: string) => string, reviewExtra?: (ex: ExamReport) => Node | null,
+  loadVideo?: (sessionId: string) => Promise<Blob>): HTMLElement {
   const chart = keystrokeChart(ex);
   return h("section", { class: "exam-report", "data-session": ex.session_id },
     h("h2", {}, `Exam: ${ex.problem_id}`, h("span", { class: "muted" },
@@ -175,6 +225,8 @@ function examSection(ex: ExamReport, replayLink?: (sessionId: string) => string,
     habitsTable(ex.habits.baseline, ex.habits.exam),
     ex.process ? processTable(ex.process) : null,
     replayLink ? h("p", {}, h("a", { href: replayLink(ex.session_id) }, "Replay this exam keystroke by keystroke")) : null,
+    videoSection(ex, loadVideo),
+    headDemoPanel(ex.head_movement_demo),
     reviewSection(ex, ex.closed && reviewExtra ? reviewExtra(ex) : null),
   );
 }
@@ -183,6 +235,8 @@ export interface RenderOptions {
   replayLink?: (sessionId: string) => string;
   /** A form under each submitted exam's review history: the decision form or the appeal form. */
   reviewExtra?: (ex: ExamReport) => Node | null;
+  /** Loads a session's webcam video (D-048); the dashboard passes one using the staff token. */
+  loadVideo?: (sessionId: string) => Promise<Blob>;
 }
 
 export function renderReport(r: Report, opts: RenderOptions = {}): HTMLElement {
@@ -204,7 +258,7 @@ export function renderReport(r: Report, opts: RenderOptions = {}): HTMLElement {
         h("strong", {}, CHECK_TEXT[b.check.status] + " "), b.check.detail),
       h("p", { class: "muted" }, b.note),
     ),
-    ...r.exams.map((ex) => examSection(ex, opts.replayLink, opts.reviewExtra)),
+    ...r.exams.map((ex) => examSection(ex, opts.replayLink, opts.reviewExtra, opts.loadVideo)),
     h("section", { class: "report-notes" },
       h("p", {}, h("strong", {}, "No single score. "), r.no_score_note),
       h("p", {}, h("strong", {}, "False flags. "), r.false_flag_note),

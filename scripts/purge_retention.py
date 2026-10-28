@@ -28,7 +28,7 @@ async def run(apply: bool, today: dt.date) -> dict[str, object]:
     settings = load_settings()
     engine = create_async_engine(settings.database_url)
     try:
-        store = Store(engine, FieldCipher(settings.data_key), {})
+        store = Store(engine, FieldCipher(settings.data_key), {}, video_root=settings.data_root / "video")   # webcam files too (D-048)
         return await governance.run_retention(store, settings.privacy, today, apply)
     finally:
         await engine.dispose()

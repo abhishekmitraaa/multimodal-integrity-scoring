@@ -10,6 +10,7 @@ import { h } from "../dom";
 import { checkPolicy, createEditor, monaco } from "../editor";
 import { PyRunner } from "../runner/runner";
 import { store } from "../state";
+import { WebcamRecorder } from "../capture/video";
 import { roleplayCard } from "./study";
 
 export async function sessionPage(root: HTMLElement, sessionId: string): Promise<void> {
@@ -48,13 +49,17 @@ export async function sessionPage(root: HTMLElement, sessionId: string): Promise
     h("h3", {}, "Tests"),
     h("ul", {}, ...problem.tests.map((t) => h("li", {}, h("code", {}, `${t.call} == ${t.expected}`)))),
   );
+  const recordVideo = ref.kind === "exam" && participant.video === true && config.video.kinds.includes(participant.kind);
+  const preview = h("video", { id: "webcam-preview", class: "webcam-preview", playsinline: true }) as HTMLVideoElement;
+  const camStatus = h("span", { id: "webcam-status", class: "webcam-status" }, "Starting camera…");
+  const camBox = recordVideo ? h("div", { class: "webcam", id: "webcam" }, preview, camStatus) : null;
   const host = h("div", { id: "editor", class: "editor" });
   const runBtn = h("button", { id: "run", disabled: true }, "Run");
   const testBtn = h("button", { id: "test", disabled: true }, "Test");
   const submitBtn = h("button", { id: "submit", class: "primary", disabled: true }, "Submit");
   root.replaceChildren(
     h("div", { class: "session" },
-      h("header", {}, h("strong", {}, problem.title), h("span", {}, ` · ${participant.pseudonym} · `), status),
+      h("header", {}, h("strong", {}, problem.title), h("span", {}, ` · ${participant.pseudonym} · `), status, camBox),
       panel,
       h("section", { class: "work" }, host, h("div", { class: "row" }, runBtn, testBtn, submitBtn), output),
     ),
@@ -94,6 +99,15 @@ export async function sessionPage(root: HTMLElement, sessionId: string): Promise
   }, panel);
   capture.snapshot("segment_start", true);
   capture.start();
+
+  // D-048: the webcam starts with the exam, after the participant ticked the separate video box.
+  const webcam = recordVideo ? new WebcamRecorder(sessionId, ref.token, config.video.chunk_ms) : null;
+  if (webcam) {
+    void webcam.start(preview).then((ok) => {
+      camStatus.textContent = ok ? "● Recording webcam" : "Camera not available: the exam continues without video.";
+      camStatus.classList.toggle("recording", ok);
+    });
+  }
 
   const policyChecks = checkPolicy(editor, config.policy);
   const mismatches = policyChecks.filter((c) => c.status === "mismatch");
@@ -136,6 +150,10 @@ export async function sessionPage(root: HTMLElement, sessionId: string): Promise
     log.push("segment_end", { reason: "submit" }, performance.now(), true);
     ended = true;
     capture.stop();
+    if (webcam) {
+      camStatus.textContent = "Saving the video…";
+      await webcam.stop();                       // the server accepts video only until the exam is submitted
+    }
     const drained = await transport.drained();
     const receipt = await api.closeSession(sessionId, ref.token);
     transport.close();
@@ -147,6 +165,7 @@ export async function sessionPage(root: HTMLElement, sessionId: string): Promise
   window.addEventListener("pagehide", () => {
     if (ended) return;
     ended = true;
+    void webcam?.stop();
     log.push("segment_end", { reason: "unload" });
     transport.beacon();
   });

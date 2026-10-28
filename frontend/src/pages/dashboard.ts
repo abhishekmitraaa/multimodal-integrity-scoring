@@ -83,6 +83,7 @@ export function dashboardPage(root: HTMLElement, params: URLSearchParams): void 
       const report = await api.staff.report(pseudonym, tokenInput.value);
       detail.replaceChildren(renderReport(report, {
         replayLink: (sid) => `#/replay?session=${sid}`,
+        loadVideo: (sid) => api.staff.video(sid, tokenInput.value),
         reviewExtra: (ex) => h("div", {},
           chainStatus(ex, tokenInput.value),
           decisionForm(ex, () => tokenInput.value, async () => {

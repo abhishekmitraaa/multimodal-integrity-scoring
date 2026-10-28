@@ -7,15 +7,19 @@ import { sha256Hex } from "../capture/hash";
 import { h } from "../dom";
 import { store } from "../state";
 
-export const NOTICE_VERSION = "draft-2";
+export const NOTICE_VERSION = "draft-3";
 const UNSET: NoticeFields = { data_fiduciary: "[to be set]", contact: "[to be set]", retention: "[to be set]" };
 
 /** The notice text; its SHA-256 is stored with the consent, so the exact wording shown is on record. */
-export const noticeText = (f: NoticeFields): string => `DRAFT NOTICE (not for real data collection)
+export const noticeText = (f: NoticeFields, video = false): string => `DRAFT NOTICE (not for real data collection)
 
 Purpose: research evaluation of a prototype that scores coding-exam sessions for human review. It is never used for grades or any academic decision.
 
 What is recorded, inside the code editor only: which keys you press and when (not the characters themselves, except as they appear in your code), your code and its edits, paste/copy events (copied text is stored only as a fingerprint), when the editor or window loses focus, Run/Test results, and basic device facts (operating system, browser, keyboard type, screen size). Nothing typed outside the editor, no mouse movement, no camera, microphone or screen recording.
+
+${video
+  ? "Webcam video (DEMO feature, no audio): only if you tick the separate box below, your webcam is recorded during the exam tasks. The video is encrypted, only an administrator can view it, and nothing analyses it. No microphone or screen recording."
+  : "No camera, microphone or screen recording."}
 
 Your data is stored under a random pseudonym, encrypted, on a machine outside any cloud-sync folder. ${f.retention === "[to be set]" ? "Retention period: [to be set]." : f.retention}
 
@@ -30,7 +34,15 @@ export function consentPage(root: HTMLElement): void {
   const studyOptIn = new URLSearchParams(location.search).get("study") === "1";      // dev testers try the study protocol
   let notice = noticeText(UNSET);
   const noticeEl = h("pre", { class: "notice", id: "notice" }, notice);
-  api.clientConfig().then((c) => { notice = noticeText(c.notice); noticeEl.textContent = notice; }, () => undefined);
+  const videoBox = h("input", { type: "checkbox", id: "video-consent" }) as HTMLInputElement;
+  const videoLabel = h("label", { id: "video-consent-label", hidden: true }, videoBox,
+    " Optional: record my webcam during the exam tasks (demo feature, no audio, not analysed).");
+  api.clientConfig().then((c) => {
+    const video = c.video.kinds.includes(kind);
+    notice = noticeText(c.notice, video);
+    noticeEl.textContent = notice;
+    videoLabel.hidden = !video;
+  }, () => undefined);
   const age = h("input", { type: "checkbox", id: "age" });
   const agree = h("input", { type: "checkbox", id: "agree" });
   const error = h("p", { class: "error", id: "consent-error" });
@@ -46,9 +58,10 @@ export function consentPage(root: HTMLElement): void {
           kind,
           study: studyOptIn,
           age_confirmed: true,
-          consent: { notice_version: NOTICE_VERSION, notice_sha256: await sha256Hex(notice), choices: { participation: true } },
+          consent: { notice_version: NOTICE_VERSION, notice_sha256: await sha256Hex(notice),
+            choices: { participation: true, video: !videoLabel.hidden && videoBox.checked } },
         });
-        store.setParticipant({ pseudonym: res.pseudonym, token: res.participant_token, kind });
+        store.setParticipant({ pseudonym: res.pseudonym, token: res.participant_token, kind, video: !videoLabel.hidden && videoBox.checked });
         location.hash = "#/setup";
       } catch (err) {
         error.textContent = String(err);
@@ -72,6 +85,7 @@ export function consentPage(root: HTMLElement): void {
       noticeEl,
       h("label", {}, age, " I am 18 or older."),
       h("label", {}, agree, " I have read the notice and agree to take part."),
+      videoLabel,
       start,
       error,
     ),

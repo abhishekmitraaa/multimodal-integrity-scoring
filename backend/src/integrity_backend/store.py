@@ -10,6 +10,7 @@ import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
 from sqlalchemy import text
@@ -17,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from .chain import ChainRecord, StoredLink, extend, genesis
 from .crypto import FieldCipher, event_aad
+from .video import VideoFiles
 from .ingest import SessionState, plan_batch
 from .wire import WireError
 
@@ -74,11 +76,21 @@ class SessionLimitError(Exception):
     """The participant already has the one session allowed for this problem."""
 
 
+class VideoError(Exception):
+    """A webcam chunk refused (D-048): out of order, or over the session's size limit."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
+
+
 class Store:
-    def __init__(self, engine: AsyncEngine, cipher: FieldCipher, pseudonym_prefixes: dict[str, str]) -> None:
+    def __init__(self, engine: AsyncEngine, cipher: FieldCipher, pseudonym_prefixes: dict[str, str],
+                 video_root: Path | None = None) -> None:
         self.engine = engine
         self.cipher = cipher
         self.prefixes = pseudonym_prefixes
+        self.video = VideoFiles(video_root, cipher) if video_root is not None else None
 
     # ---- participants and sessions -------------------------------------------------------
 
@@ -198,6 +210,50 @@ class Store:
                 "(SELECT 1 FROM sessions s WHERE s.pseudonym = a.pseudonym AND s.problem_id = a.problem_id)"),
                 {"p": pseudonym, "s": slot, "c": condition})).rowcount
         return n == 1
+
+    # ---- webcam video, a demo feature (D-048) -----------------------------------------------
+
+    async def consented_to(self, pseudonym: str, choice: str) -> bool:
+        """Whether the participant's latest consent record says yes to this separate choice."""
+        async with self.engine.connect() as conn:
+            row = (await conn.execute(text("SELECT choices FROM consent_records WHERE pseudonym = :p ORDER BY id DESC LIMIT 1"),
+                                      {"p": pseudonym})).first()
+        return bool(row is not None and (row.choices or {}).get(choice) is True)
+
+    async def add_video_chunk(self, session_id: str, index: int, data: bytes, max_session_bytes: int) -> int:
+        """Stores chunk `index` (they arrive in order; a resent chunk is accepted once). Returns the chunks stored."""
+        if self.video is None:
+            raise VideoError("video_not_configured")
+        async with self.engine.begin() as conn:
+            await conn.execute(text("SELECT 1 FROM sessions WHERE session_id = CAST(:s AS uuid) FOR UPDATE"), {"s": session_id})
+            row = (await conn.execute(text("SELECT count(*) AS n, coalesce(sum(size), 0) AS b FROM session_videos "
+                                           "WHERE session_id = CAST(:s AS uuid)"), {"s": session_id})).one()
+            if index < row.n:                                  # a resend of a stored chunk: nothing to do
+                return int(row.n)
+            if index != row.n:
+                raise VideoError("out_of_order")
+            if row.b + len(data) > max_session_bytes:
+                raise VideoError("session_limit")
+            self.video.write(session_id, index, data)
+            await conn.execute(text("INSERT INTO session_videos (session_id, chunk_index, size, sha256) "
+                                    "VALUES (CAST(:s AS uuid), :i, :n, :h)"),
+                               {"s": session_id, "i": index, "n": len(data), "h": hashlib.sha256(data).digest()})
+        return index + 1
+
+    async def video_info(self, session_ids: Sequence[str]) -> dict[str, dict[str, int]]:
+        if not session_ids:
+            return {}
+        async with self.engine.connect() as conn:
+            rows = (await conn.execute(text("SELECT session_id, count(*) AS n, sum(size) AS b FROM session_videos "
+                                            "WHERE session_id = ANY(CAST(:ids AS uuid[])) GROUP BY session_id"),
+                                       {"ids": list(session_ids)})).all()
+        return {str(r.session_id): {"chunks": int(r.n), "bytes": int(r.b)} for r in rows}
+
+    async def video_bytes(self, session_id: str) -> bytes | None:
+        info = (await self.video_info([session_id])).get(session_id)
+        if info is None or self.video is None:
+            return None
+        return self.video.read(session_id, info["chunks"])
 
     # ---- named staff accounts (D-044) -------------------------------------------------------
 
@@ -637,4 +693,6 @@ class Store:
                 {"h": self.cipher.keyed_ref(b"erasure-tombstone", pseudonym), "r": requested, "a": actor,
                  "s": counts.n_sessions, "e": counts.n_events},
             )
+        if self.video is not None:                             # webcam files (D-048) go with the rows
+            self.video.delete(session_ids)
         return int(counts.n_sessions), int(counts.n_events)

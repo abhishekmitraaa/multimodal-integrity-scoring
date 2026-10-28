@@ -13,19 +13,20 @@ from pathlib import Path
 from typing import Any, AsyncIterator, Literal
 
 import yaml
-from fastapi import FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Header, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 from integrity_ml.session_features import editor_keystrokes
 from sqlalchemy.ext.asyncio import create_async_engine
 from starlette.requests import ClientDisconnect
 
 from . import governance, study
+from .video import simulated_head_movement
 from .chain import verify_chain
 from .crypto import FieldCipher
 from .replay import replay
 from .report import build_report
 from .settings import Settings, load_config, load_settings
-from .store import SessionLimitError, Store, now_us
+from .store import SessionLimitError, Store, VideoError, now_us
 from .wire import WireError, parse_message, validate_batch
 
 PROBLEMS_DIR = Path(__file__).resolve().parents[2] / "problems"
@@ -178,6 +179,8 @@ def redact_for_participant(report: dict[str, Any]) -> dict[str, Any]:
     report["baseline"].pop("process", None)       # a feature-by-feature comparison would be a guide to imitating the baseline
     for exam in report["exams"]:
         exam.pop("process", None)
+        exam.pop("video", None)                       # D-048: the recording and the demo panel are for staff
+        exam.pop("head_movement_demo", None)
         exam["keystroke"] = {"available": False, "redacted": bool(exam["keystroke"].get("available"))}
         for f in exam["findings"]:
             f["detail"] = PARTICIPANT_TEXT.get((f["id"], f["status"]), f["detail"])
@@ -235,6 +238,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             else:
                 exam["decisions"] = r["decisions"]
             exam["appeals"] = r["appeals"]
+        videos = await store().video_info([e["session_id"] for e in report["exams"]])
+        info = await store().participant_info(pseudonym)
+        vcfg = settings.privacy.get("video") or {}
+        for exam in report["exams"]:               # D-048: a demo feature; nothing here feeds a finding or the state
+            v = videos.get(exam["session_id"])
+            exam["video"] = {"available": v is not None, "chunks": v["chunks"] if v else 0, "bytes": v["bytes"] if v else 0,
+                             "approx_seconds": round(v["chunks"] * int(vcfg.get("chunk_ms", 5000)) / 1000) if v else 0}
+            if v and vcfg.get("demo_head_movement") and info and info["kind"] != "real":
+                exam["head_movement_demo"] = simulated_head_movement(exam["session_id"], float(exam["duration_s"]))
         return redact_for_participant(report) if for_participant else report
     policy = policy_payload(settings.editor_policy)
     prefixes = {
@@ -247,7 +259,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         engine = create_async_engine(settings.database_url, pool_pre_ping=True)
-        app.state.store = Store(engine, FieldCipher(settings.data_key), prefixes)
+        app.state.store = Store(engine, FieldCipher(settings.data_key), prefixes, video_root=settings.data_root / "video")
         app.state.active = {}
         yield
         await engine.dispose()
@@ -290,7 +302,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/api/client-config")
     async def client_config() -> dict[str, Any]:
         """Everything the capture client needs from config/, so the browser hard-codes nothing."""
-        return {"policy": policy, "capture": settings.capture, "notice": governance.notice_fields(settings.privacy)}
+        video = settings.privacy.get("video") or {}
+        return {"policy": policy, "capture": settings.capture, "notice": governance.notice_fields(settings.privacy),
+                "video": {"kinds": list(video.get("kinds", [])), "chunk_ms": int(video.get("chunk_ms", 5000))}}
 
     @app.get("/api/problems/{problem_id}")
     async def problem(problem_id: str) -> dict[str, Any]:
@@ -342,6 +356,41 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(409, "the baseline check can only be taken once" if problem.get("stage") == "check"
                                 else "this task has already been started") from exc
         return {"session_id": session_id, "session_token": token}
+
+    # ---- webcam video, a demo feature (D-048) ------------------------------------------------
+
+    @app.post("/api/sessions/{session_id}/video")
+    async def upload_video(session_id: str, request: Request, seq: int, authorization: str | None = Header(None)) -> dict[str, Any]:
+        """One webcam chunk (webm, no audio) of an exam session whose participant ticked the video box."""
+        session = await session_for(session_id, _bearer(authorization))
+        vcfg = settings.privacy.get("video") or {}
+        info = await store().participant_info(session.pseudonym)
+        if info is None or info["kind"] not in vcfg.get("kinds", []) or session.kind != "exam" or session.closed:
+            raise HTTPException(403, "video is not recorded for this session")
+        if not await store().consented_to(session.pseudonym, "video"):
+            raise HTTPException(403, "the participant did not agree to video")
+        if seq < 0:
+            raise HTTPException(400, "bad chunk number")
+        data = await request.body()
+        if not data or len(data) > int(vcfg.get("max_chunk_bytes", 8_000_000)):
+            raise HTTPException(413, "chunk too large or empty")
+        try:
+            stored = await store().add_video_chunk(session.session_id, seq, data, int(vcfg.get("max_session_bytes", 400_000_000)))
+        except VideoError as exc:
+            raise HTTPException(409, exc.code) from exc
+        return {"chunks": stored}
+
+    @app.get("/api/admin/sessions/{session_id}/video")
+    async def view_video(session_id: str, authorization: str | None = Header(None)) -> Response:
+        """The session's webcam recording, for admins only; every viewing is in the access log."""
+        actor, role = await staff(authorization, admin_only=True)
+        session_id = Store.canonical(session_id)
+        if not await store().log_access_about(actor, role, "view_video", session_id=session_id):
+            raise HTTPException(404, "unknown session")
+        data = await store().video_bytes(session_id)
+        if not data:
+            raise HTTPException(404, "no video for this session")
+        return Response(content=data, media_type="video/webm", headers={"Cache-Control": "no-store"})
 
     # ---- study protocol (D-046) ----------------------------------------------------------
 

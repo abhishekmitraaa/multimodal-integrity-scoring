@@ -4,6 +4,7 @@ export interface ParticipantState {
   pseudonym: string;
   token: string;
   kind: "dev" | "synthetic";
+  video?: boolean;          // ticked the separate webcam box (D-048)
 }
 
 export interface SetupState {
